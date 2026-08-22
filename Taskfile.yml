@@ -1,0 +1,32 @@
+version: '3'
+
+tasks:
+  ensure-dist:
+    internal: true
+    cmds:
+      - '{{if eq OS "windows"}}if not exist dist mkdir dist{{else}}mkdir -p dist{{end}}'
+
+  build:
+    desc: Build the native binary
+    deps: [ensure-dist]
+    cmds:
+      - go build -o dist/patchbay .
+
+  build-windows:
+    desc: Build the Windows amd64 binary
+    deps: [ensure-dist]
+    cmds:
+      - go build -o dist/patchbay-windows-amd64.exe .
+    env:
+      GOOS: windows
+      GOARCH: amd64
+
+  test:
+    desc: Run the Go test suite
+    cmds:
+      - go test ./...
+
+  clean:
+    desc: Remove build artifacts
+    cmds:
+      - '{{if eq OS "windows"}}if exist dist rmdir /s /q dist{{else}}rm -rf dist{{end}}'
