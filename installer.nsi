@@ -104,6 +104,7 @@ Section "Uninstall"
     RMDir "$INSTDIR"
 
     ; Clean Registry entries
+    DeleteRegValue HKLM "Software\Microsoft\Windows\CurrentVersion\Run" "PatchbayTray"
     DeleteRegKey ${PRODUCT_UNINST_ROOT_KEY} "${PRODUCT_UNINST_KEY}"
     DeleteRegKey HKLM "Software\Patchbay"
 SectionEnd

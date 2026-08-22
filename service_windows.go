@@ -12,6 +12,9 @@ func queryService() (serviceState, error) {
 	return parseServiceState(out, err)
 }
 
+const startupRunKey = `HKLM\Software\Microsoft\Windows\CurrentVersion\Run`
+const startupValueName = "PatchbayTray"
+
 func installService(executable string) error {
 	if _, err := serviceRunner.Run("sc.exe", serviceCreateArgs(executable)...); err != nil {
 		return fmt.Errorf("sc create failed: %w", err)
@@ -19,6 +22,8 @@ func installService(executable string) error {
 	if _, err := serviceRunner.Run("sc.exe", "description", patchbayServiceName, patchbayServiceDesc); err != nil {
 		return fmt.Errorf("sc description failed: %w", err)
 	}
+	// Register tray executable to start on user login so tray icon is visible after reboot
+	_, _ = serviceRunner.Run("reg.exe", "add", startupRunKey, "/v", startupValueName, "/t", "REG_SZ", "/d", fmt.Sprintf(`"%s"`, executable), "/f")
 	return nil
 }
 
@@ -40,5 +45,7 @@ func deleteService() error {
 	if _, err := serviceRunner.Run("sc.exe", "delete", patchbayServiceName); err != nil {
 		return fmt.Errorf("sc delete failed: %w", err)
 	}
+	// Remove tray startup registry
+	_, _ = serviceRunner.Run("reg.exe", "delete", startupRunKey, "/v", startupValueName, "/f")
 	return nil
 }
