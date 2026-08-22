@@ -20,17 +20,19 @@ Go binary with an embedded native Vanilla JS web dashboard, Server-Sent Events
 
 ## Build
 
-Requires Go 1.22+.
+Requires Go 1.22+ and [Task](https://taskfile.dev).
 
 ```bash
-# Windows binary, no console window, single file:
-GOOS=windows GOARCH=amd64 CGO_ENABLED=0 go build -o patchbay.exe -ldflags="-H windowsgui" .
+# Build standalone Windows binary (embedded manifest & tray icon):
+task build-windows
+
+# Build Windows NSIS setup installer (dist/patchbay-setup-amd64.exe):
+# Requires NSIS (e.g. `sudo apt install nsis` on Linux / WSL)
+task build-installer
+
+# Build local dev binary on Linux / macOS:
+task build
 ```
-
-For local development/testing on Linux or macOS, just `go build .` — the
-systray becomes a no-op stub (see `systray_other.go`) and the dashboard is
-still reachable at `http://127.0.0.1:8787`.
-
 ## Run
 
 Double-click `patchbay.exe`. It starts silently in the tray — right-click

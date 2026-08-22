@@ -21,6 +21,11 @@ tasks:
       GOOS: windows
       GOARCH: amd64
 
+  build-installer:
+    desc: Build the Windows NSIS setup installer (requires makensis)
+    deps: [build-windows]
+    cmds:
+      - makensis installer.nsi
   windows-resource:
     internal: true
     cmds:
