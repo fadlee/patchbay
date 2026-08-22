@@ -17,6 +17,8 @@ import (
 type runtimeApp struct {
 	store                 *ConfigStore
 	manager               *Manager
+	logger                *TrafficLogger
+	hub                   *SSEHub
 	app                   *App
 	server                *http.Server
 	listener              net.Listener
@@ -26,13 +28,27 @@ type runtimeApp struct {
 // newRuntime constructs a runtime from an already-loaded config store and
 // manager. The HTTP dashboard address is derived from the config's AdminPort.
 func newRuntime(store *ConfigStore, manager *Manager) *runtimeApp {
+	logger, _ := NewTrafficLogger("", 1000)
+	hub := NewSSEHub()
+	if manager != nil && logger != nil {
+		manager.SetLogger(logger)
+	}
+	if logger != nil && hub != nil {
+		logger.SetOnRecord(func(entry LogEntry) {
+			hub.Broadcast("log", entry)
+		})
+	}
+
 	cfg := store.Snapshot()
 	addr := "127.0.0.1:" + strconv.Itoa(cfg.AdminPort)
+	app := NewApp(store, manager, logger, hub)
 	return &runtimeApp{
 		store:                 store,
 		manager:               manager,
-		app:                   NewApp(store, manager),
-		server:                &http.Server{Addr: addr, Handler: nil},
+		logger:                logger,
+		hub:                   hub,
+		app:                   app,
+		server:                &http.Server{Addr: addr, Handler: app.Routes()},
 		dashboardRetryTimeout: 5 * time.Second,
 	}
 }
@@ -70,6 +86,24 @@ func (rt *runtimeApp) start(ctx context.Context) error {
 		}
 	}()
 
+	// Periodically broadcast live stats via SSE
+	if rt.hub != nil {
+		go func() {
+			ticker := time.NewTicker(time.Second)
+			defer ticker.Stop()
+			for {
+				select {
+				case <-ctx.Done():
+					return
+				case <-ticker.C:
+					rt.hub.Broadcast("stats", map[string]any{
+						"rules": rt.app.ruleViews(),
+					})
+				}
+			}
+		}()
+	}
+
 	go func() {
 		<-ctx.Done()
 		rt.stop()
@@ -101,6 +135,12 @@ func (rt *runtimeApp) stop() {
 		if err := rt.server.Close(); err != nil {
 			log.Printf("dashboard server close: %v", err)
 		}
+	}
+	if rt.hub != nil {
+		rt.hub.Close()
+	}
+	if rt.logger != nil {
+		_ = rt.logger.Close()
 	}
 	rt.manager.StopAll()
 }
