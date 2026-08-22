@@ -73,6 +73,34 @@ func TestParseServiceStateStopPending(t *testing.T) {
 	}
 }
 
+func TestParseServiceStateStartPending(t *testing.T) {
+	output := []byte("SERVICE_NAME: PatchbayPortForwarder\n\tSTATE              : 2  START_PENDING\n")
+	state, err := parseServiceState(output, nil)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if state != serviceStartPending {
+		t.Fatalf("got %v, want serviceStartPending", state)
+	}
+}
+
+func TestWaitForStateContinuesThroughStartPending(t *testing.T) {
+	states := []serviceState{serviceStartPending, serviceRunning}
+	calls := 0
+	query := func() (serviceState, error) {
+		state := states[calls]
+		calls++
+		return state, nil
+	}
+
+	if err := waitForState(serviceRunning, time.Second, query); err != nil {
+		t.Fatalf("waitForState: %v", err)
+	}
+	if calls != 2 {
+		t.Fatalf("query calls = %d, want 2", calls)
+	}
+}
+
 func TestWaitForStateContinuesThroughStopPending(t *testing.T) {
 	states := []serviceState{serviceStopPending, serviceStopped}
 	calls := 0
