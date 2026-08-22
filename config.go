@@ -22,8 +22,9 @@ type Rule struct {
 
 // Config is the full persisted application state.
 type Config struct {
-	AdminPort int    `json:"admin_port"`
-	Rules     []Rule `json:"rules"`
+	AdminPort      int    `json:"admin_port"`
+	LoggingEnabled *bool  `json:"logging_enabled,omitempty"`
+	Rules          []Rule `json:"rules"`
 }
 
 const configFileName = "portforward-config.json"
@@ -72,7 +73,8 @@ func NewConfigStore(path string) (*ConfigStore, error) {
 
 	data, err := os.ReadFile(path)
 	if os.IsNotExist(err) {
-		cs.cfg = Config{AdminPort: 8787, Rules: []Rule{}}
+		defLog := true
+		cs.cfg = Config{AdminPort: 8787, LoggingEnabled: &defLog, Rules: []Rule{}}
 		if saveErr := cs.saveLocked(); saveErr != nil {
 			return nil, saveErr
 		}
@@ -149,5 +151,21 @@ func (cs *ConfigStore) DeleteRule(id string) error {
 		}
 	}
 	cs.cfg.Rules = out
+	return cs.saveLocked()
+}
+
+// IsLoggingEnabled returns true if logging is enabled (defaults to true if unset).
+func (c Config) IsLoggingEnabled() bool {
+	if c.LoggingEnabled == nil {
+		return true
+	}
+	return *c.LoggingEnabled
+}
+
+// SetLoggingEnabled updates the global logging flag and persists the config.
+func (cs *ConfigStore) SetLoggingEnabled(enabled bool) error {
+	cs.mu.Lock()
+	defer cs.mu.Unlock()
+	cs.cfg.LoggingEnabled = &enabled
 	return cs.saveLocked()
 }

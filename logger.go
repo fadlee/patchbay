@@ -30,6 +30,7 @@ type TrafficLogger struct {
 	mu          sync.RWMutex
 	dir         string
 	capacity    int
+	enabled     bool
 	entries     []LogEntry
 	currentDay  string
 	currentFile *os.File
@@ -51,6 +52,7 @@ func NewTrafficLogger(dir string, capacity int) (*TrafficLogger, error) {
 	return &TrafficLogger{
 		dir:      dir,
 		capacity: capacity,
+		enabled:  true,
 		entries:  make([]LogEntry, 0, capacity),
 	}, nil
 }
@@ -63,11 +65,28 @@ func (l *TrafficLogger) SetOnRecord(fn func(LogEntry)) {
 	l.onRecord = fn
 }
 
+// SetEnabled turns recording on or off globally.
+func (l *TrafficLogger) SetEnabled(enabled bool) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	l.enabled = enabled
+}
+
+// IsEnabled reports whether the logger is actively recording sessions.
+func (l *TrafficLogger) IsEnabled() bool {
+	l.mu.RLock()
+	defer l.mu.RUnlock()
+	return l.enabled
+}
+
 // Record appends an entry to the ring buffer and writes it to the daily log file.
 func (l *TrafficLogger) Record(entry LogEntry) {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 
+	if !l.enabled {
+		return
+	}
 	// Append to in-memory ring buffer (newest at the end)
 	if len(l.entries) >= l.capacity {
 		copy(l.entries, l.entries[1:])

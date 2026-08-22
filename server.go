@@ -83,6 +83,8 @@ func (a *App) Routes() http.Handler {
 	mux.HandleFunc("/api/logs/summary", a.handleAPILogsSummary)
 	mux.HandleFunc("/api/logs/clear", a.handleAPILogsClear)
 	mux.HandleFunc("/api/logs", a.handleAPILogs)
+	mux.HandleFunc("/api/config", a.handleAPIConfig)
+	mux.HandleFunc("/api/config/logging", a.handleAPIToggleLogging)
 	return mux
 }
 
@@ -295,6 +297,48 @@ func (a *App) handleAPILogsSummary(w http.ResponseWriter, r *http.Request) {
 		summary = a.logger.Summary(since)
 	}
 	writeJSON(w, http.StatusOK, summary)
+}
+
+func (a *App) handleAPIConfig(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	cfg := a.store.Snapshot()
+	loggingEnabled := cfg.IsLoggingEnabled()
+	if a.logger != nil {
+		loggingEnabled = a.logger.IsEnabled()
+	}
+	writeJSON(w, http.StatusOK, map[string]any{
+		"admin_port":      cfg.AdminPort,
+		"logging_enabled": loggingEnabled,
+	})
+}
+
+func (a *App) handleAPIToggleLogging(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	var req struct {
+		Enabled *bool `json:"enabled"`
+	}
+	_ = json.NewDecoder(r.Body).Decode(&req)
+
+	cfg := a.store.Snapshot()
+	newVal := !cfg.IsLoggingEnabled()
+	if req.Enabled != nil {
+		newVal = *req.Enabled
+	}
+
+	if err := a.store.SetLoggingEnabled(newVal); err != nil {
+		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
+		return
+	}
+	if a.logger != nil {
+		a.logger.SetEnabled(newVal)
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"logging_enabled": newVal})
 }
 
 func writeJSON(w http.ResponseWriter, status int, data any) {

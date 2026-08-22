@@ -99,3 +99,32 @@ func TestTrafficSummaryAggregation(t *testing.T) {
 		t.Fatalf("unexpected summary: %+v", summary)
 	}
 }
+
+func TestTrafficLoggerToggleDisabled(t *testing.T) {
+	dir := t.TempDir()
+	logger, err := NewTrafficLogger(dir, 10)
+	if err != nil {
+		t.Fatalf("NewTrafficLogger: %v", err)
+	}
+	defer logger.Close()
+
+	if !logger.IsEnabled() {
+		t.Fatal("logger should be enabled by default")
+	}
+
+	logger.SetEnabled(false)
+	if logger.IsEnabled() {
+		t.Fatal("logger should be disabled after SetEnabled(false)")
+	}
+
+	logger.Record(LogEntry{ID: "dropped-log", RuleID: "r1", Status: "closed"})
+	if len(logger.Recent(10, "")) != 0 {
+		t.Fatal("disabled logger should not record entries")
+	}
+
+	logger.SetEnabled(true)
+	logger.Record(LogEntry{ID: "allowed-log", RuleID: "r1", Status: "closed"})
+	if len(logger.Recent(10, "")) != 1 {
+		t.Fatal("enabled logger should record entries")
+	}
+}

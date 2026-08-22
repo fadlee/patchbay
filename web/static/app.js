@@ -10,6 +10,7 @@
   let chartPoints = [];
   let autoScroll = true;
   let selectedRuleFilter = '';
+  let loggingEnabled = true;
 
   // DOM Elements
   const rulesListEl = document.getElementById('rules-list');
@@ -19,10 +20,10 @@
   const ruleFilterSelect = document.getElementById('log-rule-filter');
   const autoScrollCheckbox = document.getElementById('auto-scroll-toggle');
   const clearLogsBtn = document.getElementById('clear-logs-btn');
+  const toggleLoggingBtn = document.getElementById('toggle-logging-btn');
   const addRuleForm = document.getElementById('add-rule-form');
   const canvas = document.getElementById('traffic-chart');
   const ctx = canvas ? canvas.getContext('2d') : null;
-
   // Format helpers
   function formatBytes(bytes) {
     if (!bytes || bytes === 0) return '0 B';
@@ -323,6 +324,33 @@
     }
   }
 
+
+  function updateLoggingBtnUI() {
+    if (!toggleLoggingBtn) return;
+    if (loggingEnabled) {
+      toggleLoggingBtn.textContent = 'Logging: ON';
+      toggleLoggingBtn.className = 'action-btn toggle-log-btn btn-log-on';
+      toggleLoggingBtn.title = 'Traffic logging is active. Click to pause.';
+    } else {
+      toggleLoggingBtn.textContent = 'Logging: OFF';
+      toggleLoggingBtn.className = 'action-btn toggle-log-btn btn-log-off';
+      toggleLoggingBtn.title = 'Traffic logging is paused. Click to enable.';
+    }
+  }
+
+  async function fetchConfig() {
+    try {
+      const res = await fetch('/api/config');
+      if (!res.ok) return;
+      const data = await res.json();
+      if (typeof data.logging_enabled === 'boolean') {
+        loggingEnabled = data.logging_enabled;
+        updateLoggingBtnUI();
+      }
+    } catch (e) {
+      console.error('Failed to load config:', e);
+    }
+  }
   // SSE Setup
   let lastBytesTotal = 0;
   let lastStatsTime = Date.now();
@@ -484,13 +512,34 @@
     });
   }
 
+  if (toggleLoggingBtn) {
+    toggleLoggingBtn.addEventListener('click', async () => {
+      toggleLoggingBtn.disabled = true;
+      try {
+        const res = await fetch('/api/config/logging', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ enabled: !loggingEnabled })
+        });
+        if (res.ok) {
+          const data = await res.json();
+          loggingEnabled = data.logging_enabled;
+          updateLoggingBtnUI();
+        }
+      } catch (err) {
+        alert('Failed to toggle logging: ' + err.message);
+      }
+      toggleLoggingBtn.disabled = false;
+    });
+  }
+
   window.addEventListener('resize', drawChart);
 
   // Initialize
+  fetchConfig();
   fetchRules();
   fetchLogs();
   initSSE();
-
   // Initial empty chart draw
   drawChart();
 })();

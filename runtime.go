@@ -40,6 +40,9 @@ func newRuntime(store *ConfigStore, manager *Manager) *runtimeApp {
 	}
 
 	cfg := store.Snapshot()
+	if logger != nil {
+		logger.SetEnabled(cfg.IsLoggingEnabled())
+	}
 	addr := "127.0.0.1:" + strconv.Itoa(cfg.AdminPort)
 	app := NewApp(store, manager, logger, hub)
 	return &runtimeApp{

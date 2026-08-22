@@ -470,6 +470,22 @@ button.danger:hover {
   font-family: var(--mono);
   font-size: 11px;
 }
+
+.toggle-log-btn {
+  font-weight: 600;
+  transition: all 0.15s ease;
+}
+.btn-log-on {
+  background: var(--signal-dim) !important;
+  border-color: var(--signal) !important;
+  color: var(--signal) !important;
+}
+.btn-log-off {
+  background: var(--surface-raised) !important;
+  border-color: var(--border-bright) !important;
+  color: var(--text-muted) !important;
+  opacity: 0.8;
+}
 .control-select {
   font-family: var(--mono);
   font-size: 11px;

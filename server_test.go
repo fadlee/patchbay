@@ -127,3 +127,38 @@ func TestStaticAssetsServeVanillaAppJS(t *testing.T) {
 		t.Fatalf("GET /static/app.js status = %d, want 200", rec.Code)
 	}
 }
+
+func TestConfigLoggingToggleEndpoint(t *testing.T) {
+	store, _ := NewConfigStore(t.TempDir() + "/config.json")
+	manager := NewManager()
+	logger, _ := NewTrafficLogger(t.TempDir(), 100)
+	hub := NewSSEHub()
+	app := NewApp(store, manager, logger, hub)
+
+	// Test GET /api/config
+	req := httptest.NewRequest(http.MethodGet, "/api/config", nil)
+	rec := httptest.NewRecorder()
+	app.Routes().ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("GET /api/config status = %d, want 200", rec.Code)
+	}
+	if !strings.Contains(rec.Body.String(), `"logging_enabled":true`) {
+		t.Fatalf("expected logging_enabled:true in config response, got %s", rec.Body.String())
+	}
+
+	// Test POST /api/config/logging to disable
+	toggleReq := httptest.NewRequest(http.MethodPost, "/api/config/logging", strings.NewReader(`{"enabled":false}`))
+	toggleRec := httptest.NewRecorder()
+	app.Routes().ServeHTTP(toggleRec, toggleReq)
+
+	if toggleRec.Code != http.StatusOK {
+		t.Fatalf("POST /api/config/logging status = %d, want 200", toggleRec.Code)
+	}
+	if !strings.Contains(toggleRec.Body.String(), `"logging_enabled":false`) {
+		t.Fatalf("expected logging_enabled:false, got %s", toggleRec.Body.String())
+	}
+	if logger.IsEnabled() {
+		t.Fatal("logger should be disabled after toggle endpoint called")
+	}
+}
