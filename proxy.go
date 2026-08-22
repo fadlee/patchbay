@@ -64,6 +64,7 @@ type Manager struct {
 	mu         sync.Mutex
 	running    map[string]*runningRule
 	fwWarnings map[string]string
+	logger     *TrafficLogger
 }
 
 func NewManager() *Manager {
@@ -71,6 +72,20 @@ func NewManager() *Manager {
 		running:    make(map[string]*runningRule),
 		fwWarnings: make(map[string]string),
 	}
+}
+
+func NewManagerWithLogger(logger *TrafficLogger) *Manager {
+	return &Manager{
+		running:    make(map[string]*runningRule),
+		fwWarnings: make(map[string]string),
+		logger:     logger,
+	}
+}
+
+func (m *Manager) SetLogger(logger *TrafficLogger) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.logger = logger
 }
 
 // FirewallWarning returns a human-readable warning if the firewall rule for
@@ -125,13 +140,13 @@ func (m *Manager) Start(r Rule) error {
 	}
 
 	if r.Protocol == "tcp" || r.Protocol == "tcp+udp" {
-		if err := startTCP(ctx, listenAddr, r.ListenPort, r.TargetAddr, r.TargetPort, stats, rr.conns); err != nil {
+		if err := startTCP(ctx, r, listenAddr, r.ListenPort, r.TargetAddr, r.TargetPort, stats, rr.conns, m.logger); err != nil {
 			m.Stop(r.ID)
 			return err
 		}
 	}
 	if r.Protocol == "udp" || r.Protocol == "tcp+udp" {
-		if err := startUDP(ctx, listenAddr, r.ListenPort, r.TargetAddr, r.TargetPort, stats, rr.conns); err != nil {
+		if err := startUDP(ctx, r, listenAddr, r.ListenPort, r.TargetAddr, r.TargetPort, stats, rr.conns, m.logger); err != nil {
 			m.Stop(r.ID)
 			return err
 		}
@@ -178,7 +193,7 @@ func (m *Manager) StopAll() {
 	}
 }
 
-func startTCP(ctx context.Context, listenAddr string, listenPort int, targetAddr string, targetPort int, stats *Stats, tracker *connTracker) error {
+func startTCP(ctx context.Context, r Rule, listenAddr string, listenPort int, targetAddr string, targetPort int, stats *Stats, tracker *connTracker, logger *TrafficLogger) error {
 	addr := net.JoinHostPort(listenAddr, itoa(listenPort))
 	ln, err := net.Listen("tcp", addr)
 	if err != nil {
@@ -205,13 +220,17 @@ func startTCP(ctx context.Context, listenAddr string, listenPort int, targetAddr
 				}
 			}
 			tracker.add(conn)
-			go handleTCPConn(ctx, conn, target, stats, tracker)
+			go handleTCPConn(ctx, r, conn, target, stats, tracker, logger)
 		}
 	}()
 	return nil
 }
 
-func handleTCPConn(ctx context.Context, src net.Conn, target string, stats *Stats, tracker *connTracker) {
+func handleTCPConn(ctx context.Context, r Rule, src net.Conn, target string, stats *Stats, tracker *connTracker, logger *TrafficLogger) {
+	startTime := time.Now()
+	clientAddr := src.RemoteAddr().String()
+	sessionID := newID()
+
 	defer func() {
 		tracker.remove(src)
 		src.Close()
@@ -221,6 +240,19 @@ func handleTCPConn(ctx context.Context, src net.Conn, target string, stats *Stat
 	dst, err := dialer.DialContext(ctx, "tcp", target)
 	if err != nil {
 		log.Printf("tcp dial %s failed: %v", target, err)
+		if logger != nil {
+			logger.Record(LogEntry{
+				ID:         sessionID,
+				Time:       startTime,
+				RuleID:     r.ID,
+				RuleName:   r.Name,
+				Protocol:   "tcp",
+				ClientAddr: clientAddr,
+				TargetAddr: target,
+				DurationMS: time.Since(startTime).Milliseconds(),
+				Status:     "error",
+			})
+		}
 		return
 	}
 	tracker.add(dst)
@@ -233,12 +265,14 @@ func handleTCPConn(ctx context.Context, src net.Conn, target string, stats *Stat
 	atomic.AddInt64(&stats.TotalConns, 1)
 	defer atomic.AddInt64(&stats.ActiveConns, -1)
 
+	var bytesIn, bytesOut int64
 	var wg sync.WaitGroup
 	wg.Add(2)
 	go func() {
 		defer wg.Done()
 		n, _ := io.Copy(dst, src)
 		atomic.AddInt64(&stats.BytesIn, n)
+		atomic.AddInt64(&bytesIn, n)
 		if tc, ok := dst.(*net.TCPConn); ok {
 			tc.CloseWrite()
 		}
@@ -247,11 +281,28 @@ func handleTCPConn(ctx context.Context, src net.Conn, target string, stats *Stat
 		defer wg.Done()
 		n, _ := io.Copy(src, dst)
 		atomic.AddInt64(&stats.BytesOut, n)
+		atomic.AddInt64(&bytesOut, n)
 		if tc, ok := src.(*net.TCPConn); ok {
 			tc.CloseWrite()
 		}
 	}()
 	wg.Wait()
+
+	if logger != nil {
+		logger.Record(LogEntry{
+			ID:         sessionID,
+			Time:       startTime,
+			RuleID:     r.ID,
+			RuleName:   r.Name,
+			Protocol:   "tcp",
+			ClientAddr: clientAddr,
+			TargetAddr: target,
+			BytesIn:    bytesIn,
+			BytesOut:   bytesOut,
+			DurationMS: time.Since(startTime).Milliseconds(),
+			Status:     "closed",
+		})
+	}
 }
 
 // udpSession tracks one client<->target relay so replies route back correctly.
@@ -260,7 +311,7 @@ type udpSession struct {
 	lastActive time.Time
 }
 
-func startUDP(ctx context.Context, listenAddr string, listenPort int, targetAddr string, targetPort int, stats *Stats, tracker *connTracker) error {
+func startUDP(ctx context.Context, r Rule, listenAddr string, listenPort int, targetAddr string, targetPort int, stats *Stats, tracker *connTracker, logger *TrafficLogger) error {
 	laddr, err := net.ResolveUDPAddr("udp", net.JoinHostPort(listenAddr, itoa(listenPort)))
 	if err != nil {
 		return err
@@ -271,7 +322,8 @@ func startUDP(ctx context.Context, listenAddr string, listenPort int, targetAddr
 	}
 	tracker.add(conn)
 
-	taddr, err := net.ResolveUDPAddr("udp", net.JoinHostPort(targetAddr, itoa(targetPort)))
+	targetStr := net.JoinHostPort(targetAddr, itoa(targetPort))
+	taddr, err := net.ResolveUDPAddr("udp", targetStr)
 	if err != nil {
 		conn.Close()
 		tracker.remove(conn)
