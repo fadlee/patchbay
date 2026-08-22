@@ -23,6 +23,40 @@ type Stats struct {
 type runningRule struct {
 	cancel context.CancelFunc
 	stats  *Stats
+	conns  *connTracker
+}
+
+type connTracker struct {
+	mu    sync.Mutex
+	conns map[net.Conn]struct{}
+}
+
+func newConnTracker() *connTracker {
+	return &connTracker{conns: make(map[net.Conn]struct{})}
+}
+
+func (t *connTracker) add(conn net.Conn) {
+	t.mu.Lock()
+	t.conns[conn] = struct{}{}
+	t.mu.Unlock()
+}
+
+func (t *connTracker) remove(conn net.Conn) {
+	t.mu.Lock()
+	delete(t.conns, conn)
+	t.mu.Unlock()
+}
+
+func (t *connTracker) closeAll() {
+	t.mu.Lock()
+	conns := make([]net.Conn, 0, len(t.conns))
+	for conn := range t.conns {
+		conns = append(conns, conn)
+	}
+	t.mu.Unlock()
+	for _, conn := range conns {
+		conn.Close()
+	}
 }
 
 // Manager owns all currently-running forwarders, keyed by rule ID.
@@ -81,7 +115,8 @@ func (m *Manager) Start(r Rule) error {
 	}
 	ctx, cancel := context.WithCancel(context.Background())
 	stats := &Stats{}
-	m.running[r.ID] = &runningRule{cancel: cancel, stats: stats}
+	rr := &runningRule{cancel: cancel, stats: stats, conns: newConnTracker()}
+	m.running[r.ID] = rr
 	m.mu.Unlock()
 
 	listenAddr := r.ListenAddr
@@ -90,13 +125,13 @@ func (m *Manager) Start(r Rule) error {
 	}
 
 	if r.Protocol == "tcp" || r.Protocol == "tcp+udp" {
-		if err := startTCP(ctx, listenAddr, r.ListenPort, r.TargetAddr, r.TargetPort, stats); err != nil {
+		if err := startTCP(ctx, listenAddr, r.ListenPort, r.TargetAddr, r.TargetPort, stats, rr.conns); err != nil {
 			m.Stop(r.ID)
 			return err
 		}
 	}
 	if r.Protocol == "udp" || r.Protocol == "tcp+udp" {
-		if err := startUDP(ctx, listenAddr, r.ListenPort, r.TargetAddr, r.TargetPort, stats); err != nil {
+		if err := startUDP(ctx, listenAddr, r.ListenPort, r.TargetAddr, r.TargetPort, stats, rr.conns); err != nil {
 			m.Stop(r.ID)
 			return err
 		}
@@ -114,7 +149,7 @@ func (m *Manager) Start(r Rule) error {
 	return nil
 }
 
-// Stop halts forwarding for a rule.
+// Stop halts forwarding for a rule and closes all active proxy connections.
 func (m *Manager) Stop(id string) {
 	m.mu.Lock()
 	rr, ok := m.running[id]
@@ -125,6 +160,7 @@ func (m *Manager) Stop(id string) {
 	m.mu.Unlock()
 	if ok {
 		rr.cancel()
+		rr.conns.closeAll()
 	}
 	removeFirewallRule(id)
 }
@@ -142,7 +178,7 @@ func (m *Manager) StopAll() {
 	}
 }
 
-func startTCP(ctx context.Context, listenAddr string, listenPort int, targetAddr string, targetPort int, stats *Stats) error {
+func startTCP(ctx context.Context, listenAddr string, listenPort int, targetAddr string, targetPort int, stats *Stats, tracker *connTracker) error {
 	addr := net.JoinHostPort(listenAddr, itoa(listenPort))
 	ln, err := net.Listen("tcp", addr)
 	if err != nil {
@@ -168,14 +204,18 @@ func startTCP(ctx context.Context, listenAddr string, listenPort int, targetAddr
 					return
 				}
 			}
-			go handleTCPConn(ctx, conn, target, stats)
+			tracker.add(conn)
+			go handleTCPConn(ctx, conn, target, stats, tracker)
 		}
 	}()
 	return nil
 }
 
-func handleTCPConn(ctx context.Context, src net.Conn, target string, stats *Stats) {
-	defer src.Close()
+func handleTCPConn(ctx context.Context, src net.Conn, target string, stats *Stats, tracker *connTracker) {
+	defer func() {
+		tracker.remove(src)
+		src.Close()
+	}()
 
 	dialer := net.Dialer{Timeout: 5 * time.Second}
 	dst, err := dialer.DialContext(ctx, "tcp", target)
@@ -183,7 +223,11 @@ func handleTCPConn(ctx context.Context, src net.Conn, target string, stats *Stat
 		log.Printf("tcp dial %s failed: %v", target, err)
 		return
 	}
-	defer dst.Close()
+	tracker.add(dst)
+	defer func() {
+		tracker.remove(dst)
+		dst.Close()
+	}()
 
 	atomic.AddInt64(&stats.ActiveConns, 1)
 	atomic.AddInt64(&stats.TotalConns, 1)
@@ -216,7 +260,7 @@ type udpSession struct {
 	lastActive time.Time
 }
 
-func startUDP(ctx context.Context, listenAddr string, listenPort int, targetAddr string, targetPort int, stats *Stats) error {
+func startUDP(ctx context.Context, listenAddr string, listenPort int, targetAddr string, targetPort int, stats *Stats, tracker *connTracker) error {
 	laddr, err := net.ResolveUDPAddr("udp", net.JoinHostPort(listenAddr, itoa(listenPort)))
 	if err != nil {
 		return err
@@ -225,10 +269,12 @@ func startUDP(ctx context.Context, listenAddr string, listenPort int, targetAddr
 	if err != nil {
 		return err
 	}
+	tracker.add(conn)
 
 	taddr, err := net.ResolveUDPAddr("udp", net.JoinHostPort(targetAddr, itoa(targetPort)))
 	if err != nil {
 		conn.Close()
+		tracker.remove(conn)
 		return err
 	}
 
@@ -253,6 +299,7 @@ func startUDP(ctx context.Context, listenAddr string, listenPort int, targetAddr
 				for k, s := range sessions {
 					if time.Since(s.lastActive) > 5*time.Minute {
 						s.targetConn.Close()
+						tracker.remove(s.targetConn)
 						delete(sessions, k)
 					}
 				}
@@ -286,6 +333,7 @@ func startUDP(ctx context.Context, listenAddr string, listenPort int, targetAddr
 					log.Printf("udp dial target failed: %v", err)
 					continue
 				}
+				tracker.add(tc)
 				sess = &udpSession{targetConn: tc}
 				sessions[key] = sess
 				atomic.AddInt64(&stats.TotalConns, 1)
@@ -293,6 +341,7 @@ func startUDP(ctx context.Context, listenAddr string, listenPort int, targetAddr
 
 				// Relay replies from target back to this client.
 				go func(client *net.UDPAddr, tc *net.UDPConn, key string) {
+					defer tracker.remove(tc)
 					rbuf := make([]byte, 65535)
 					for {
 						n, err := tc.Read(rbuf)
