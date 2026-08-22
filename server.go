@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"html/template"
+	"io/fs"
 	"log"
 	"net/http"
 	"strconv"
@@ -79,8 +80,11 @@ func (a *App) pageData() pageData {
 func (a *App) Routes() http.Handler {
 	mux := http.NewServeMux()
 
-	mux.Handle("/static/", http.FileServer(http.FS(staticFS)))
-
+	staticRoot, err := fs.Sub(staticFS, "web")
+	if err != nil {
+		panic(err)
+	}
+	mux.Handle("/static/", http.FileServer(http.FS(staticRoot)))
 	mux.HandleFunc("/", a.handleIndex)
 	mux.HandleFunc("/partials/rules", a.handleRulesPartial)
 	mux.HandleFunc("/rules", a.handleCreateRule) // POST
