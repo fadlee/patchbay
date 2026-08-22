@@ -44,7 +44,7 @@ const (
 	idMenuDisable = 1006
 
 	mbIconError = 0x00000010
-
+	mbIconInfo  = 0x00000040
 	imageIcon      = 1
 	lrDefaultColor = 0x00000000
 )
@@ -242,29 +242,36 @@ func trayWndProc(hwnd syscall.Handle, message uint32, wParam, lParam uintptr) ui
 			if app != nil && app.cfg.OnStartService != nil {
 				if err := app.cfg.OnStartService(); err != nil {
 					showTrayError(hwnd, "Start service failed", err.Error())
+				} else {
+					showTrayInfo(hwnd, "Service Started", "Patchbay service is now running in the background.")
 				}
 			}
 		case idMenuStop:
 			if app != nil && app.cfg.OnStopService != nil {
 				if err := app.cfg.OnStopService(); err != nil {
 					showTrayError(hwnd, "Stop service failed", err.Error())
+				} else {
+					showTrayInfo(hwnd, "Service Stopped", "Patchbay service has been stopped.")
 				}
 			}
 		case idMenuEnable:
 			if app != nil && app.cfg.OnEnableService != nil {
 				if err := app.cfg.OnEnableService(); err != nil {
 					showTrayError(hwnd, "Enable service mode failed", err.Error())
+				} else {
+					showTrayInfo(hwnd, "Service Mode Enabled", "Patchbay has been installed and started as a Windows Service.\n\nIt will now start automatically at boot across user sessions.")
 				}
 			}
 		case idMenuDisable:
 			if app != nil && app.cfg.OnDisableService != nil {
 				if err := app.cfg.OnDisableService(); err != nil {
 					showTrayError(hwnd, "Disable service mode failed", err.Error())
+				} else {
+					showTrayInfo(hwnd, "Service Mode Disabled", "Patchbay service has been stopped and removed.\n\nSwitched back to local tray application mode.")
 				}
 			}
 		}
 		return 0
-
 	case wmDestroy, wmClose:
 		procPostQuitMessage.Call(0)
 		return 0
@@ -319,6 +326,16 @@ func showTrayError(hwnd syscall.Handle, title, body string) {
 		uintptr(unsafe.Pointer(syscall.StringToUTF16Ptr(body))),
 		uintptr(unsafe.Pointer(syscall.StringToUTF16Ptr(title))),
 		mbIconError,
+	)
+}
+
+// showTrayInfo displays a Windows message box with an information title and icon.
+func showTrayInfo(hwnd syscall.Handle, title, body string) {
+	procMessageBoxW.Call(
+		uintptr(hwnd),
+		uintptr(unsafe.Pointer(syscall.StringToUTF16Ptr(body))),
+		uintptr(unsafe.Pointer(syscall.StringToUTF16Ptr(title))),
+		mbIconInfo,
 	)
 }
 func loWord(v uintptr) uint16 {
