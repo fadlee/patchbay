@@ -8,16 +8,19 @@ import (
 	"net"
 	"net/http"
 	"strconv"
+	"syscall"
+	"time"
 )
 
 // runtimeApp owns the config store, forwarding manager, HTTP dashboard, and
 // their lifecycle. Both local tray mode and Windows service mode use it.
 type runtimeApp struct {
-	store    *ConfigStore
-	manager  *Manager
-	app      *App
-	server   *http.Server
-	listener net.Listener
+	store                 *ConfigStore
+	manager               *Manager
+	app                   *App
+	server                *http.Server
+	listener              net.Listener
+	dashboardRetryTimeout time.Duration
 }
 
 // newRuntime constructs a runtime from an already-loaded config store and
@@ -26,10 +29,11 @@ func newRuntime(store *ConfigStore, manager *Manager) *runtimeApp {
 	cfg := store.Snapshot()
 	addr := "127.0.0.1:" + strconv.Itoa(cfg.AdminPort)
 	return &runtimeApp{
-		store:   store,
-		manager: manager,
-		app:     NewApp(store, manager),
-		server:  &http.Server{Addr: addr, Handler: nil},
+		store:                 store,
+		manager:               manager,
+		app:                   NewApp(store, manager),
+		server:                &http.Server{Addr: addr, Handler: nil},
+		dashboardRetryTimeout: 5 * time.Second,
 	}
 }
 
@@ -38,10 +42,17 @@ func (rt *runtimeApp) dashboardURL() string {
 	return "http://" + rt.server.Addr + "/"
 }
 
-// start begins enabled forwarding rules and serves the HTTP dashboard. It
-// returns once the dashboard listener is bound; serving continues in the
-// background until stop is called or the context is cancelled.
+// start reserves the HTTP dashboard port before starting enabled forwarding
+// rules. This prevents a failed dashboard bind from leaving a partial local
+// forwarding runtime alive during a service-to-tray handoff.
 func (rt *runtimeApp) start(ctx context.Context) error {
+	ln, err := rt.listenDashboard()
+	if err != nil {
+		return err
+	}
+	rt.listener = ln
+	rt.server.Handler = rt.app.Routes()
+
 	cfg := rt.store.Snapshot()
 	for _, r := range cfg.Rules {
 		if !r.Enabled {
@@ -51,13 +62,6 @@ func (rt *runtimeApp) start(ctx context.Context) error {
 			log.Printf("failed to start rule %q: %v", r.Name, err)
 		}
 	}
-
-	ln, err := net.Listen("tcp", rt.server.Addr)
-	if err != nil {
-		return fmt.Errorf("dashboard listen: %w", err)
-	}
-	rt.listener = ln
-	rt.server.Handler = rt.app.Routes()
 
 	go func() {
 		log.Printf("dashboard listening on %s", rt.dashboardURL())
@@ -72,6 +76,22 @@ func (rt *runtimeApp) start(ctx context.Context) error {
 	}()
 
 	return nil
+}
+
+// listenDashboard waits briefly only for an address-in-use error. Windows
+// can report SCM stopped before its process has released the HTTP listener.
+func (rt *runtimeApp) listenDashboard() (net.Listener, error) {
+	deadline := time.Now().Add(rt.dashboardRetryTimeout)
+	for {
+		ln, err := net.Listen("tcp", rt.server.Addr)
+		if err == nil {
+			return ln, nil
+		}
+		if !errors.Is(err, syscall.EADDRINUSE) || !time.Now().Before(deadline) {
+			return nil, fmt.Errorf("dashboard listen: %w", err)
+		}
+		time.Sleep(100 * time.Millisecond)
+	}
 }
 
 // stop closes the HTTP dashboard listener and all forwarding rules. It is

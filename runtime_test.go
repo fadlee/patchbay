@@ -121,3 +121,70 @@ func TestRuntimeStopClosesHTTPAndForwardingRuntime(t *testing.T) {
 		t.Fatal("rule should be stopped after runtime stop")
 	}
 }
+
+func TestRuntimeWaitsForDashboardPortRelease(t *testing.T) {
+	occupied, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatalf("occupy dashboard port: %v", err)
+	}
+	adminPort := occupied.Addr().(*net.TCPAddr).Port
+
+	path := filepath.Join(t.TempDir(), "config.json")
+	writeTestConfig(t, path, Config{AdminPort: adminPort})
+	store, err := NewConfigStore(path)
+	if err != nil {
+		t.Fatalf("NewConfigStore: %v", err)
+	}
+	rt := newRuntime(store, NewManager())
+	rt.dashboardRetryTimeout = time.Second
+
+	go func() {
+		time.Sleep(50 * time.Millisecond)
+		_ = occupied.Close()
+	}()
+
+	if err := rt.start(context.Background()); err != nil {
+		t.Fatalf("runtime should wait for dashboard port release: %v", err)
+	}
+	defer rt.stop()
+}
+
+func TestRuntimeDoesNotStartRulesWhenDashboardPortUnavailable(t *testing.T) {
+	occupied, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatalf("occupy dashboard port: %v", err)
+	}
+	defer occupied.Close()
+
+	target, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatalf("listen target: %v", err)
+	}
+	defer target.Close()
+
+	path := filepath.Join(t.TempDir(), "config.json")
+	writeTestConfig(t, path, Config{
+		AdminPort: occupied.Addr().(*net.TCPAddr).Port,
+		Rules: []Rule{{
+			ID: "enabled-rule", Name: "Enabled", Protocol: "tcp",
+			ListenAddr: "127.0.0.1", ListenPort: freeTCPPort(t),
+			TargetAddr: "127.0.0.1", TargetPort: target.Addr().(*net.TCPAddr).Port,
+			Enabled: true,
+		}},
+	})
+	store, err := NewConfigStore(path)
+	if err != nil {
+		t.Fatalf("NewConfigStore: %v", err)
+	}
+	manager := NewManager()
+	rt := newRuntime(store, manager)
+	rt.dashboardRetryTimeout = 0
+
+	if err := rt.start(context.Background()); err == nil {
+		t.Fatal("runtime start should fail while dashboard port is occupied")
+	}
+	defer rt.stop()
+	if manager.IsRunning("enabled-rule") {
+		t.Fatal("rule must not start before the dashboard listener is acquired")
+	}
+}
