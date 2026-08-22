@@ -59,6 +59,25 @@ func doDisableService(state serviceState, stopFn func() error, deleteFn func() e
 	return nil
 }
 
+// stopServiceMode stops a service-backed runtime, then rechecks SCM. If the
+// service registration disappeared while stopping, ownership returns to the
+// tray and the local runtime is started before local mode is reported.
+func stopServiceMode(stopFn func() error, queryFn func() (serviceState, error), startLocalFn func() error) (serviceState, error) {
+	if err := stopFn(); err != nil {
+		return serviceRunning, err
+	}
+	state, err := queryFn()
+	if err != nil {
+		return serviceRunning, fmt.Errorf("query after stop: %w", err)
+	}
+	if state == serviceNotInstalled {
+		if err := startLocalFn(); err != nil {
+			return state, fmt.Errorf("start local runtime: %w", err)
+		}
+	}
+	return state, nil
+}
+
 // trayConfig holds all callbacks and state the systray event loop needs.
 // In local mode the service-related fields are zero/nil. In client mode
 // OnQuit must not stop the service — only the tray process.

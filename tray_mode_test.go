@@ -21,6 +21,31 @@ func TestSelectTrayModeClientWhenInstalled(t *testing.T) {
 	}
 }
 
+func TestStopRemovedServiceStartsLocalRuntime(t *testing.T) {
+	started := false
+	stopFn := func() error { return nil }
+	queryFn := func() (serviceState, error) { return serviceNotInstalled, nil }
+	startLocalFn := func() error { started = true; return nil }
+
+	state, err := stopServiceMode(stopFn, queryFn, startLocalFn)
+	if err != nil {
+		t.Fatalf("stopServiceMode: %v", err)
+	}
+	if state != serviceNotInstalled || !started {
+		t.Fatalf("state = %v, local started = %t; want not installed, true", state, started)
+	}
+}
+
+func TestStopRemovedServiceKeepsClientModeWhenLocalStartFails(t *testing.T) {
+	stopFn := func() error { return nil }
+	queryFn := func() (serviceState, error) { return serviceNotInstalled, nil }
+	startLocalFn := func() error { return errors.New("port still in use") }
+
+	if _, err := stopServiceMode(stopFn, queryFn, startLocalFn); err == nil {
+		t.Fatal("stopServiceMode should return local runtime start failure")
+	}
+}
+
 func TestEnableServiceReleasesLocalRuntimeBeforeServiceStart(t *testing.T) {
 	var calls []string
 	installFn := func(_ string) error { calls = append(calls, "install"); return nil }

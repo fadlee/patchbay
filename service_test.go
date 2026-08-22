@@ -172,6 +172,23 @@ func TestWaitForStateContinuesThroughStopPending(t *testing.T) {
 	}
 }
 
+func TestWaitForStoppedAcceptsRemovedService(t *testing.T) {
+	states := []serviceState{serviceStopPending, serviceNotInstalled}
+	calls := 0
+	query := func() (serviceState, error) {
+		state := states[calls]
+		calls++
+		return state, nil
+	}
+
+	if err := waitForState(serviceStopped, time.Second, query); err != nil {
+		t.Fatalf("waitForState: %v", err)
+	}
+	if calls != 2 {
+		t.Fatalf("query calls = %d, want 2", calls)
+	}
+}
+
 func TestParseServiceStateNotInstalled(t *testing.T) {
 	output := []byte("[SC] EnumQueryServicesStatus:OpenService FAILED 1060:\nThe specified service does not exist as an installed service.\n")
 	state, err := parseServiceState(output, errors.New("exit status 1"))

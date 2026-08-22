@@ -121,7 +121,7 @@ func waitForState(target serviceState, timeout time.Duration, query func() (serv
 		if err != nil {
 			return err
 		}
-		if state == target {
+		if state == target || (target == serviceStopped && state == serviceNotInstalled) {
 			return nil
 		}
 		time.Sleep(500 * time.Millisecond)

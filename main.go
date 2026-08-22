@@ -130,10 +130,15 @@ func runTray() error {
 			return nil
 		}
 		trayCfg.OnStopService = func() error {
-			if err := stopService(); err != nil {
+			state, err := stopServiceMode(stopService, queryService, startLocalRuntime)
+			if err != nil {
 				return err
 			}
-			trayCfg.ServiceState = serviceStopped
+			if state == serviceNotInstalled {
+				setLocalMode()
+				return nil
+			}
+			trayCfg.ServiceState = state
 			return nil
 		}
 		trayCfg.OnDisableService = func() error {
