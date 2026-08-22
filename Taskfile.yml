@@ -16,7 +16,7 @@ tasks:
     desc: Build the Windows amd64 binary with administrator privileges
     deps: [ensure-dist, windows-resource]
     cmds:
-      - go build -o dist/patchbay-windows-amd64.exe .
+      - go build -ldflags "-H=windowsgui" -o dist/patchbay-windows-amd64.exe .
     env:
       GOOS: windows
       GOARCH: amd64
@@ -24,7 +24,7 @@ tasks:
   windows-resource:
     internal: true
     cmds:
-      - go run github.com/akavel/rsrc@v0.10.2 -manifest windows.manifest -arch amd64 -o windows_amd64.syso
+      - go run github.com/akavel/rsrc@v0.10.2 -manifest windows.manifest -ico assets/icon.ico -arch amd64 -o windows_amd64.syso
 
   test:
     desc: Run the Go test suite
