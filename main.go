@@ -11,17 +11,27 @@ import (
 	"syscall"
 )
 
-func main() {
-	if len(os.Args) > 1 && os.Args[1] == "service" {
-		if err := runService(); err != nil {
-			log.Fatalf("service error: %v", err)
-		}
-		return
+// dispatchMode selects between service and tray entry points based on the
+// first command-line argument. It is extracted from main for testability.
+func dispatchMode(args []string, serviceFn, trayFn func() error) error {
+	if len(args) > 1 && args[1] == "service" {
+		return serviceFn()
 	}
+	return trayFn()
+}
 
+func main() {
+	if err := dispatchMode(os.Args, runService, runTray); err != nil {
+		log.Fatalf("%v", err)
+	}
+}
+
+// runTray starts the local forwarding runtime and enters the systray event
+// loop. This is the normal user-session entry point.
+func runTray() error {
 	store, err := NewConfigStore("")
 	if err != nil {
-		log.Fatalf("failed to load config: %v", err)
+		return fmt.Errorf("failed to load config: %w", err)
 	}
 
 	manager := NewManager()
@@ -31,7 +41,7 @@ func main() {
 	defer cancel()
 
 	if err := rt.start(ctx); err != nil {
-		log.Fatalf("failed to start runtime: %v", err)
+		return fmt.Errorf("failed to start runtime: %w", err)
 	}
 
 	// Allow Ctrl+C during development (the real Windows build exits via the
@@ -49,14 +59,11 @@ func main() {
 	// control to the tray's blocking event loop.
 	runtime.LockOSThread()
 
-	err = runSystray(
+	return runSystray(
 		"patchbay — port forwarding",
 		func() { openBrowser(rt.dashboardURL()) },
 		func() { rt.stop(); os.Exit(0) },
 	)
-	if err != nil {
-		log.Printf("systray error: %v", err)
-	}
 }
 
 // openBrowser launches the user's default browser to the dashboard URL.
