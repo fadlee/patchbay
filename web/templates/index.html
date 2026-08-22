@@ -4,28 +4,31 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>patchbay</title>
+  <title>patchbay — port forwarding & traffic monitor</title>
   <script>
     if (localStorage.getItem('patchbay-theme') === 'dark') document.documentElement.dataset.theme = 'dark';
   </script>
   <link rel="stylesheet" href="/static/style.css">
-  <script src="/static/htmx.min.js"></script>
+  <script defer src="/static/app.js"></script>
 </head>
 <body>
   <div class="shell">
 
-    <div class="header">
+    <header class="header">
       <div class="brand">
         <div class="mark">patch<span class="dot">&bull;</span>bay</div>
         <div class="tagline">// tcp/udp forwarding, wired plainly</div>
       </div>
       <div class="theme-controls">
-        <div class="summary" id="summary" hx-get="/partials/rules" hx-trigger="every 3s" hx-select="#summary-inner" hx-target="this" hx-swap="innerHTML">
-          <span id="summary-inner">{{template "summary_inner.html" .}}</span>
+        <div id="sse-status" class="sse-badge badge-reconnecting">
+          <span class="status-dot dot-reconnecting"></span> Connecting...
+        </div>
+        <div class="summary">
+          <span id="summary-text">Loading rules...</span>
         </div>
         <button class="theme-toggle" type="button" id="theme-toggle" aria-label="Switch to dark mode">dark mode</button>
       </div>
-    </div>
+    </header>
     <script>
       const themeToggle = document.getElementById('theme-toggle');
       const setTheme = (theme) => {
@@ -41,20 +44,16 @@
 
     <div class="divider"></div>
 
-    <div class="bay-label">active jacks</div>
+    <section class="section">
+      <div class="bay-label">active jacks</div>
+      <div id="rules-list">
+        <div class="empty-state">
+          <div class="empty-desc">Loading active forwarding rules...</div>
+        </div>
+      </div>
+    </section>
 
-    <div id="rules-container"
-         hx-get="/partials/rules"
-         hx-trigger="every 3s"
-         hx-swap="innerHTML">
-      {{template "rules_table.html" .}}
-    </div>
-
-    <form class="add-form"
-          hx-post="/rules"
-          hx-target="#rules-container"
-          hx-swap="innerHTML"
-          hx-on::after-request="if(event.detail.successful) this.reset()">
+    <form class="add-form" id="add-rule-form">
       <div class="bay-label">patch a new rule</div>
       <div class="form-grid">
         <div class="field">
@@ -75,7 +74,7 @@
         </div>
         <div class="field">
           <label for="target_addr">target host</label>
-          <input id="target_addr" name="target_addr" type="text" placeholder="192.168.1.100" required>
+          <input id="target_addr" name="target_addr" type="text" placeholder="127.0.0.1" required>
         </div>
         <div class="field">
           <label for="target_port">target port</label>
@@ -85,6 +84,53 @@
       </div>
       <input type="hidden" name="listen_addr" value="0.0.0.0">
     </form>
+
+    <div class="divider"></div>
+
+    <section class="section">
+      <div class="bay-label">realtime bandwidth & throughput</div>
+      <div class="chart-container">
+        <canvas id="traffic-chart" style="width: 100%; height: 160px;"></canvas>
+      </div>
+    </section>
+
+    <div class="divider"></div>
+
+    <section class="section">
+      <div class="section-header">
+        <div class="bay-label">live connection logs</div>
+        <div class="log-controls">
+          <select id="log-rule-filter" class="control-select">
+            <option value="">All Rules</option>
+          </select>
+          <label class="control-checkbox">
+            <input type="checkbox" id="auto-scroll-toggle" checked> Auto-update
+          </label>
+          <button id="clear-logs-btn" class="action-btn" type="button">Clear</button>
+        </div>
+      </div>
+      <div class="table-wrap log-table-wrap">
+        <table class="rules-table logs-table">
+          <thead>
+            <tr>
+              <th>TIME</th>
+              <th>RULE</th>
+              <th>PROTO</th>
+              <th>CLIENT</th>
+              <th>TARGET</th>
+              <th>IN / OUT</th>
+              <th>DURATION</th>
+              <th>STATUS</th>
+            </tr>
+          </thead>
+          <tbody id="logs-tbody">
+            <tr>
+              <td colspan="8" class="text-center text-muted" style="padding: 24px">Waiting for connection activity...</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
 
   </div>
 </body>

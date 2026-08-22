@@ -21,14 +21,7 @@ var templateFS embed.FS
 //go:embed web/static/*
 var staticFS embed.FS
 
-var tmpl = template.Must(template.New("").Funcs(template.FuncMap{
-	"statusLabel": func(running bool) string {
-		if running {
-			return "Running"
-		}
-		return "Stopped"
-	},
-}).ParseFS(templateFS, "web/templates/*.html"))
+var tmpl = template.Must(template.ParseFS(templateFS, "web/templates/*.html"))
 
 // App wires the config store, proxy manager, traffic logger, and SSE hub into HTTP handlers.
 type App struct {

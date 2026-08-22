@@ -433,11 +433,155 @@ button.danger:hover {
   color: #0c1410;
 }
 
-.htmx-request .submit-btn { opacity: 0.6; }
+.sse-badge {
+  font-family: var(--mono);
+  font-size: 11px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 8px;
+  border-radius: 4px;
+  background: var(--surface-raised);
+  border: 1px solid var(--border);
+}
+.status-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  display: inline-block;
+}
+.dot-online { background: var(--signal); box-shadow: 0 0 6px var(--signal); }
+.dot-reconnecting { background: var(--idle); animation: pulse 1.5s infinite; }
+.dot-offline { background: var(--danger); }
+@keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }
+
+.section-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.log-controls {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-family: var(--mono);
+  font-size: 11px;
+}
+.control-select {
+  font-family: var(--mono);
+  font-size: 11px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  color: var(--text);
+  padding: 3px 6px;
+  border-radius: 4px;
+}
+.control-checkbox {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+
+.chart-container {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 14px 14px 8px;
+  margin-bottom: 24px;
+}
+
+.log-table-wrap {
+  max-height: 280px;
+  overflow-y: auto;
+}
+.logs-table {
+  font-size: 12px;
+}
+.logs-table th, .logs-table td {
+  padding: 8px 10px;
+}
+.mono-text {
+  font-family: var(--mono);
+  font-size: 11px;
+}
+.text-center { text-align: center; }
+.proto-tag {
+  font-family: var(--mono);
+  font-size: 9px;
+  padding: 1px 4px;
+  border-radius: 3px;
+  background: var(--surface-raised);
+  border: 1px solid var(--border);
+  color: var(--text-muted);
+  margin-left: 4px;
+}
+.badge-success { background: var(--signal-dim); color: var(--signal); }
+.badge-danger { background: var(--danger-dim); color: var(--danger); }
+.badge-active { background: var(--idle-dim); color: var(--idle); }
+
+.table-wrap {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow-x: auto;
+  margin-bottom: 24px;
+}
+.rules-table {
+  width: 100%;
+  border-collapse: collapse;
+  text-align: left;
+}
+.rules-table th {
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  color: var(--text-faint);
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface-raised);
+}
+.rules-table td {
+  padding: 12px;
+  border-bottom: 1px solid var(--border);
+  vertical-align: middle;
+}
+.rules-table tr:last-child td {
+  border-bottom: none;
+}
+.status-indicator {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  display: inline-block;
+}
+.status-indicator.running { background: var(--signal); box-shadow: 0 0 6px var(--signal); }
+.status-indicator.stopped { background: var(--border-bright); }
+.mono-addr { font-family: var(--mono); font-size: 12.5px; font-weight: 500; }
+.mono-val { font-family: var(--mono); font-size: 12px; }
+.action-buttons { display: flex; gap: 6px; justify-content: flex-end; }
+.action-btn {
+  font-family: var(--mono);
+  font-size: 11px;
+  padding: 4px 8px;
+  border: 1px solid var(--border-bright);
+  border-radius: 4px;
+  background: var(--surface);
+  color: var(--text);
+  cursor: pointer;
+}
+.action-btn:hover { background: var(--surface-raised); }
+.btn-start { border-color: var(--signal); color: var(--signal); }
+.btn-start:hover { background: var(--signal-dim); }
+.btn-stop { border-color: var(--danger); color: var(--danger); }
+.btn-stop:hover { background: var(--danger-dim); }
+.delete-btn { font-size: 14px; line-height: 1; padding: 2px 7px; color: var(--text-muted); }
+.delete-btn:hover { color: var(--danger); border-color: var(--danger); }
 
 @media (max-width: 720px) {
   .form-grid { grid-template-columns: 1fr 1fr; }
-  .rule { grid-template-columns: 1fr; }
-  .circuit { order: 2; }
-  .actions { order: 3; justify-content: flex-start; }
 }

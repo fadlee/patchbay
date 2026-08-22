@@ -111,3 +111,19 @@ func TestLogsSummaryJSONEndpoint(t *testing.T) {
 		t.Fatalf("expected total_in in summary response, got %s", rec.Body.String())
 	}
 }
+
+func TestStaticAssetsServeVanillaAppJS(t *testing.T) {
+	store, _ := NewConfigStore(t.TempDir() + "/config.json")
+	manager := NewManager()
+	logger, _ := NewTrafficLogger(t.TempDir(), 100)
+	hub := NewSSEHub()
+	app := NewApp(store, manager, logger, hub)
+
+	req := httptest.NewRequest(http.MethodGet, "/static/app.js", nil)
+	rec := httptest.NewRecorder()
+	app.Routes().ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("GET /static/app.js status = %d, want 200", rec.Code)
+	}
+}
