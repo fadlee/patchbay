@@ -35,18 +35,38 @@ type ConfigStore struct {
 	cfg  Config
 }
 
-func defaultConfigPath() string {
-	dir, err := os.Executable()
-	if err != nil {
-		return configFileName
+// migrateConfig copies a valid source config to dst if dst does not exist.
+// If the source is absent the call is a no-op. If the source exists but is
+// unreadable or contains invalid JSON the call fails without creating dst,
+// so a broken adjacent config never silently overwrites a fresh destination.
+func migrateConfig(src, dst string) error {
+	if _, err := os.Stat(dst); err == nil {
+		return nil // destination already exists — never overwrite
+	} else if !os.IsNotExist(err) {
+		return fmt.Errorf("stat config destination: %w", err)
 	}
-	return filepath.Join(filepath.Dir(dir), configFileName)
+	srcData, err := os.ReadFile(src)
+	if os.IsNotExist(err) {
+		return nil // no adjacent source to migrate
+	}
+	if err != nil {
+		return fmt.Errorf("read source config for migration: %w", err)
+	}
+	var cfg Config
+	if err := json.Unmarshal(srcData, &cfg); err != nil {
+		return fmt.Errorf("invalid source config, refusing to migrate: %w", err)
+	}
+	if err := os.MkdirAll(filepath.Dir(dst), 0755); err != nil {
+		return fmt.Errorf("create config directory: %w", err)
+	}
+	return os.WriteFile(dst, srcData, 0644)
 }
 
 // NewConfigStore loads config from disk, creating a default one if absent.
 func NewConfigStore(path string) (*ConfigStore, error) {
-	if path == "" {
-		path = defaultConfigPath()
+	path, err := prepareConfigPath(path)
+	if err != nil {
+		return nil, err
 	}
 	cs := &ConfigStore{path: path}
 
