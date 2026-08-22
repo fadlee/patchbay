@@ -31,6 +31,49 @@ The user-launched executable detects that the service is installed/running, avoi
 
 If the service is installed but stopped, the tray shows the service as stopped and offers `Start service`; it does not start a local forwarding copy. This prevents two owners from racing over config, firewall rules, or listen ports.
 
+### Ownership diagram
+
+```mermaid
+flowchart LR
+    User[User] --> Tray[Tray process<br/>interactive session]
+    Tray -->|Open dashboard / rule actions| HTTP[127.0.0.1:<AdminPort><br/>HTTP dashboard]
+    Tray -->|sc.exe install / start / stop / delete| SCM[Windows Service Control Manager]
+    SCM --> Service[Service process<br/>patchbay.exe service]
+    Service --> HTTP
+    Service --> Runtime[Forwarding manager]
+    Runtime --> TCP[TCP listeners]
+    Runtime --> UDP[UDP listeners]
+    Service --> Config[%ProgramData%\\patchbay\\portforward-config.json]
+    HTTP --> Config
+
+    classDef control fill:#e8f1ff,stroke:#3973b8,color:#172b4d
+    classDef runtime fill:#e4f7ed,stroke:#168a5b,color:#123c2b
+    class Tray,SCM,HTTP control
+    class Service,Runtime,TCP,UDP,Config runtime
+```
+
+The service is the only process that owns forwarding listeners and the dashboard while service mode is enabled. The tray controls SCM and sends normal rule actions to the service-owned HTTP API; it never starts a second listener set.
+
+### Service mode state transitions
+
+```mermaid
+stateDiagram-v2
+    [*] --> LocalTray
+    LocalTray --> Installing: Enable service mode
+    Installing --> ServiceRunning: install + AUTO_START + start succeed
+    Installing --> LocalTray: any operation fails
+    ServiceRunning --> ServiceStopped: service stops / crashes
+    ServiceStopped --> ServiceRunning: Start service
+    ServiceRunning --> Removing: Disable service mode
+    ServiceStopped --> Removing: Disable service mode
+    Removing --> LocalTray: stop + delete succeed
+    Removing --> ServiceStopped: stop/delete fails
+    LocalTray --> LocalTray: Quit tray
+    ServiceRunning --> ServiceRunning: Quit tray
+```
+
+`Rule.Enabled` is independent of these service states: it determines which rules the service starts after boot, while SCM determines whether the service process itself is running.
+
 ## Service lifecycle menu
 
 The tray menu contains:
