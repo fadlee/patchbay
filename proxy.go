@@ -27,12 +27,25 @@ type runningRule struct {
 
 // Manager owns all currently-running forwarders, keyed by rule ID.
 type Manager struct {
-	mu      sync.Mutex
-	running map[string]*runningRule
+	mu         sync.Mutex
+	running    map[string]*runningRule
+	fwWarnings map[string]string
 }
 
 func NewManager() *Manager {
-	return &Manager{running: make(map[string]*runningRule)}
+	return &Manager{
+		running:    make(map[string]*runningRule),
+		fwWarnings: make(map[string]string),
+	}
+}
+
+// FirewallWarning returns a human-readable warning if the firewall rule for
+// this rule ID failed to apply (e.g. not running as Administrator), or an
+// empty string if there's no problem to report.
+func (m *Manager) FirewallWarning(id string) string {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	return m.fwWarnings[id]
 }
 
 // IsRunning reports whether a rule currently has active listeners.
@@ -88,6 +101,16 @@ func (m *Manager) Start(r Rule) error {
 			return err
 		}
 	}
+
+	fwErr := ensureFirewallRule(r)
+	m.mu.Lock()
+	if fwErr != nil {
+		m.fwWarnings[r.ID] = "firewall rule not applied — run as Administrator (or install as a service)"
+	} else {
+		delete(m.fwWarnings, r.ID)
+	}
+	m.mu.Unlock()
+
 	return nil
 }
 
@@ -98,10 +121,12 @@ func (m *Manager) Stop(id string) {
 	if ok {
 		delete(m.running, id)
 	}
+	delete(m.fwWarnings, id)
 	m.mu.Unlock()
 	if ok {
 		rr.cancel()
 	}
+	removeFirewallRule(id)
 }
 
 // StopAll halts every running forwarder (used on shutdown).

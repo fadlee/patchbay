@@ -39,8 +39,9 @@ func NewApp(store *ConfigStore, manager *Manager) *App {
 // ruleView is what templates render — a Rule plus its live status.
 type ruleView struct {
 	Rule
-	Running bool
-	Stats   Stats
+	Running         bool
+	Stats           Stats
+	FirewallWarning string
 }
 
 func (a *App) ruleViews() []ruleView {
@@ -48,9 +49,10 @@ func (a *App) ruleViews() []ruleView {
 	views := make([]ruleView, 0, len(cfg.Rules))
 	for _, r := range cfg.Rules {
 		views = append(views, ruleView{
-			Rule:    r,
-			Running: a.manager.IsRunning(r.ID),
-			Stats:   a.manager.StatsFor(r.ID),
+			Rule:            r,
+			Running:         a.manager.IsRunning(r.ID),
+			Stats:           a.manager.StatsFor(r.ID),
+			FirewallWarning: a.manager.FirewallWarning(r.ID),
 		})
 	}
 	return views

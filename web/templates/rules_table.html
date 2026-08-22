@@ -19,6 +19,7 @@
         <span>{{.ListenAddr}}:{{.ListenPort}} &rarr; {{.TargetAddr}}:{{.TargetPort}}</span>
         {{if .Running}}<span>&middot; {{.Stats.ActiveConns}} active &middot; {{.Stats.TotalConns}} total</span>{{end}}
       </div>
+      {{if .FirewallWarning}}<div class="fw-warning">&#9888; {{.FirewallWarning}}</div>{{end}}
     </div>
 
     <div class="actions">
