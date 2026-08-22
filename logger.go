@@ -147,3 +147,55 @@ func (l *TrafficLogger) Close() error {
 	}
 	return nil
 }
+
+// TrafficBucket aggregates bytes and connections within a time slice.
+type TrafficBucket struct {
+	Timestamp   time.Time `json:"timestamp"`
+	BytesIn     int64     `json:"bytes_in"`
+	BytesOut    int64     `json:"bytes_out"`
+	Connections int       `json:"connections"`
+}
+
+// TrafficSummary provides aggregate totals and time-series buckets for charting.
+type TrafficSummary struct {
+	Buckets    []TrafficBucket `json:"buckets"`
+	TotalIn    int64           `json:"total_in"`
+	TotalOut   int64           `json:"total_out"`
+	TotalConns int             `json:"total_conns"`
+}
+
+// Summary aggregates traffic events recorded since the specified timestamp.
+func (l *TrafficLogger) Summary(since time.Time) TrafficSummary {
+	l.mu.RLock()
+	defer l.mu.RUnlock()
+
+	var sum TrafficSummary
+	bucketMap := make(map[int64]*TrafficBucket)
+
+	for _, e := range l.entries {
+		if !since.IsZero() && e.Time.Before(since) {
+			continue
+		}
+		sum.TotalIn += e.BytesIn
+		sum.TotalOut += e.BytesOut
+		sum.TotalConns++
+
+		// Group into 5-minute buckets for chart points
+		bucketTime := e.Time.Truncate(5 * time.Minute)
+		key := bucketTime.Unix()
+		b, ok := bucketMap[key]
+		if !ok {
+			b = &TrafficBucket{Timestamp: bucketTime}
+			bucketMap[key] = b
+		}
+		b.BytesIn += e.BytesIn
+		b.BytesOut += e.BytesOut
+		b.Connections++
+	}
+
+	// Convert map to slice
+	for _, b := range bucketMap {
+		sum.Buckets = append(sum.Buckets, *b)
+	}
+	return sum
+}

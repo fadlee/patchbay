@@ -6,6 +6,7 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 )
 
 func TestRoutesServeEmbeddedStaticAssets(t *testing.T) {
@@ -87,5 +88,26 @@ func TestLogsJSONEndpoints(t *testing.T) {
 	}
 	if !strings.Contains(rec.Body.String(), "test-log") {
 		t.Fatalf("expected log entry in response, got %s", rec.Body.String())
+	}
+}
+
+func TestLogsSummaryJSONEndpoint(t *testing.T) {
+	store, _ := NewConfigStore(t.TempDir() + "/config.json")
+	manager := NewManager()
+	logger, _ := NewTrafficLogger(t.TempDir(), 100)
+	logger.Record(LogEntry{ID: "test-log", RuleID: "r1", BytesIn: 500, BytesOut: 1000, Status: "closed", Time: time.Now()})
+	hub := NewSSEHub()
+	app := NewApp(store, manager, logger, hub)
+
+	// Test GET /api/logs/summary
+	req := httptest.NewRequest(http.MethodGet, "/api/logs/summary", nil)
+	rec := httptest.NewRecorder()
+	app.Routes().ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("GET /api/logs/summary status = %d, want 200", rec.Code)
+	}
+	if !strings.Contains(rec.Body.String(), "total_in") {
+		t.Fatalf("expected total_in in summary response, got %s", rec.Body.String())
 	}
 }

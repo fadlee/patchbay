@@ -84,3 +84,18 @@ func TestPersistentLogFileAppend(t *testing.T) {
 		t.Fatal("expected non-empty log file")
 	}
 }
+
+func TestTrafficSummaryAggregation(t *testing.T) {
+	dir := t.TempDir()
+	logger, _ := NewTrafficLogger(dir, 100)
+	defer logger.Close()
+
+	now := time.Now().Truncate(time.Hour)
+	logger.Record(LogEntry{Time: now.Add(5 * time.Minute), BytesIn: 1000, BytesOut: 2000, Status: "closed"})
+	logger.Record(LogEntry{Time: now.Add(15 * time.Minute), BytesIn: 500, BytesOut: 1500, Status: "closed"})
+
+	summary := logger.Summary(now)
+	if summary.TotalIn != 1500 || summary.TotalOut != 3500 || summary.TotalConns != 2 {
+		t.Fatalf("unexpected summary: %+v", summary)
+	}
+}

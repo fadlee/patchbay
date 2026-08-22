@@ -12,6 +12,7 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"time"
 )
 
 //go:embed web/templates/*.html
@@ -86,9 +87,9 @@ func (a *App) Routes() http.Handler {
 	// JSON REST APIs
 	mux.HandleFunc("/api/rules", a.handleAPIRules)
 	mux.HandleFunc("/api/rules/", a.handleAPIRuleOperations)
-	mux.HandleFunc("/api/logs", a.handleAPILogs)
+	mux.HandleFunc("/api/logs/summary", a.handleAPILogsSummary)
 	mux.HandleFunc("/api/logs/clear", a.handleAPILogsClear)
-
+	mux.HandleFunc("/api/logs", a.handleAPILogs)
 	return mux
 }
 
@@ -283,6 +284,24 @@ func (a *App) handleAPILogsClear(w http.ResponseWriter, r *http.Request) {
 		a.logger.Clear()
 	}
 	writeJSON(w, http.StatusOK, map[string]string{"status": "cleared"})
+}
+
+func (a *App) handleAPILogsSummary(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	since := time.Now().Add(-24 * time.Hour)
+	if h := r.URL.Query().Get("hours"); h != "" {
+		if val, err := strconv.Atoi(h); err == nil && val > 0 {
+			since = time.Now().Add(-time.Duration(val) * time.Hour)
+		}
+	}
+	var summary TrafficSummary
+	if a.logger != nil {
+		summary = a.logger.Summary(since)
+	}
+	writeJSON(w, http.StatusOK, summary)
 }
 
 func writeJSON(w http.ResponseWriter, status int, data any) {
