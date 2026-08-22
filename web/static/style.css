@@ -1,8 +1,7 @@
 /* ---------------------------------------------------------------
    Portal — patch-bay themed control panel for port forwarding.
-   Palette: deep graphite surfaces, phosphor-green signal accent,
-   amber for idle/stopped state. Monospace carries all technical
-   data (ports, addresses); a humanist sans carries labels/copy.
+   Palette: paper light mode, graphite dark mode, phosphor-green
+   signal accent, and amber for idle/stopped state.
    ------------------------------------------------------------- */
 
 @font-face {
@@ -11,6 +10,27 @@
 }
 
 :root {
+  --bg: #f4f2ec;
+  --surface: #fffdf8;
+  --surface-raised: #eeebe3;
+  --border: #d8d4ca;
+  --border-bright: #b9b3a8;
+  --text: #20252b;
+  --text-muted: #66707a;
+  --text-faint: #8b8d87;
+  --signal: #168a5b;
+  --signal-dim: #cde9dc;
+  --idle: #a56a14;
+  --idle-dim: #ead9b8;
+  --danger: #c83b3b;
+  --danger-dim: #f1cccc;
+  --grid-dot: rgba(32, 37, 43, 0.06);
+  --radius: 6px;
+  --mono: 'JetBrains Mono', 'JetBrains Mono Fallback', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  --sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+}
+
+:root[data-theme="dark"] {
   --bg: #14171c;
   --surface: #1b1f27;
   --surface-raised: #20242e;
@@ -25,9 +45,7 @@
   --idle-dim: #5c4a26;
   --danger: #ff6b6b;
   --danger-dim: #5c2c2c;
-  --radius: 6px;
-  --mono: 'JetBrains Mono', 'JetBrains Mono Fallback', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-  --sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --grid-dot: rgba(255, 255, 255, 0.035);
 }
 
 * { box-sizing: border-box; }
@@ -41,11 +59,6 @@ html, body {
   -webkit-font-smoothing: antialiased;
 }
 
-body {
-  background-image:
-    radial-gradient(circle at 1px 1px, rgba(255,255,255,0.035) 1px, transparent 0);
-  background-size: 22px 22px;
-}
 
 a { color: inherit; }
 
@@ -55,7 +68,11 @@ a { color: inherit; }
   padding: 40px 24px 80px;
 }
 
-/* --- Header --- */
+body {
+  background-image:
+    radial-gradient(circle at 1px 1px, var(--grid-dot) 1px, transparent 0);
+  background-size: 22px 22px;
+}
 
 .header {
   display: flex;
@@ -79,6 +96,33 @@ a { color: inherit; }
   letter-spacing: -0.02em;
   color: var(--text);
 }
+.theme-controls {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.theme-toggle {
+  font-family: var(--mono);
+  font-size: 10px;
+  line-height: 1;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  border: 1px solid var(--border-bright);
+  background: transparent;
+  color: var(--text-muted);
+  padding: 7px 9px;
+  border-radius: var(--radius);
+  cursor: pointer;
+}
+
+.theme-toggle:hover,
+.theme-toggle:focus-visible {
+  border-color: var(--signal);
+  color: var(--signal);
+  outline: none;
+}
+
 
 .brand .mark .dot {
   color: var(--signal);
