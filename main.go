@@ -8,8 +8,8 @@ import (
 	"os/exec"
 	"os/signal"
 	"runtime"
-	"syscall"
 	"strconv"
+	"syscall"
 )
 
 // dispatchMode selects between service and tray entry points based on the
@@ -39,19 +39,31 @@ func runTray() error {
 	dashboardURL := "http://127.0.0.1:" + strconv.Itoa(cfg.AdminPort) + "/"
 
 	// Query SCM to decide whether we run a local runtime or act as client.
-	svcState, _ := queryService()
+	svcState, err := queryService()
+	if err != nil {
+		return fmt.Errorf("query service state: %w", err)
+	}
 	mode := selectTrayMode(svcState)
 
 	var rt *runtimeApp
+	startLocalRuntime := func() error {
+		local := newRuntime(store, NewManager())
+		if err := local.start(context.Background()); err != nil {
+			return fmt.Errorf("start local runtime: %w", err)
+		}
+		rt = local
+		return nil
+	}
+	stopLocalRuntime := func() {
+		if rt != nil {
+			rt.stop()
+			rt = nil
+		}
+	}
+
 	if mode == trayModeLocal {
-		manager := NewManager()
-		rt = newRuntime(store, manager)
-
-		ctx, cancel := context.WithCancel(context.Background())
-		defer cancel()
-
-		if err := rt.start(ctx); err != nil {
-			return fmt.Errorf("failed to start runtime: %w", err)
+		if err := startLocalRuntime(); err != nil {
+			return err
 		}
 
 		// Allow Ctrl+C during development (the real Windows build exits via
@@ -61,7 +73,7 @@ func runTray() error {
 		signal.Notify(sigCh, os.Interrupt, syscall.SIGTERM)
 		go func() {
 			<-sigCh
-			rt.stop()
+			stopLocalRuntime()
 			os.Exit(0)
 		}()
 	} else {
@@ -80,24 +92,64 @@ func runTray() error {
 		ServiceState: svcState,
 		OnOpen:       func() { openBrowser(dashboardURL) },
 	}
+	trayCfg.OnQuit = func() { stopLocalRuntime(); os.Exit(0) }
 
-	if mode == trayModeLocal {
-		trayCfg.OnQuit = func() { rt.stop(); os.Exit(0) }
+	var setLocalMode func()
+	var setClientMode func(serviceState)
+
+	setLocalMode = func() {
+		trayCfg.Mode = trayModeLocal
+		trayCfg.ServiceState = serviceNotInstalled
+		trayCfg.OnStartService = nil
+		trayCfg.OnStopService = nil
+		trayCfg.OnDisableService = nil
 		trayCfg.OnEnableService = func() error {
 			exe, err := os.Executable()
 			if err != nil {
 				return fmt.Errorf("resolve executable: %w", err)
 			}
-			return doEnableService(installService, startService, exe)
+			if err := doEnableService(installService, stopLocalRuntime, startService, deleteService, startLocalRuntime, exe); err != nil {
+				return err
+			}
+			setClientMode(serviceRunning)
+			return nil
 		}
-	} else {
-		// Client mode: Quit exits only the tray, not the service.
-		trayCfg.OnQuit = func() { os.Exit(0) }
-		trayCfg.OnStartService = startService
-		trayCfg.OnStopService = stopService
+	}
+
+	setClientMode = func(state serviceState) {
+		trayCfg.Mode = trayModeClient
+		trayCfg.ServiceState = state
+		trayCfg.OnEnableService = nil
+		trayCfg.OnStartService = func() error {
+			if err := startService(); err != nil {
+				return err
+			}
+			trayCfg.ServiceState = serviceRunning
+			return nil
+		}
+		trayCfg.OnStopService = func() error {
+			if err := stopService(); err != nil {
+				return err
+			}
+			trayCfg.ServiceState = serviceStopped
+			return nil
+		}
 		trayCfg.OnDisableService = func() error {
-			return doDisableService(stopService, deleteService)
+			if err := doDisableService(trayCfg.ServiceState, stopService, deleteService); err != nil {
+				return err
+			}
+			if err := startLocalRuntime(); err != nil {
+				return err
+			}
+			setLocalMode()
+			return nil
 		}
+	}
+
+	if mode == trayModeLocal {
+		setLocalMode()
+	} else {
+		setClientMode(svcState)
 	}
 
 	return runSystray(trayCfg)

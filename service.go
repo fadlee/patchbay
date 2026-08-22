@@ -63,6 +63,22 @@ func serviceCommandLine(executable string) string {
 	return fmt.Sprintf(`"%s" service`, executable)
 }
 
+// serviceCreateArgs returns sc.exe create arguments with every option and
+// value as separate tokens. sc.exe rejects combined tokens such as
+// "start= auto" with ERROR_INVALID_COMMAND_LINE (1639).
+func serviceCreateArgs(executable string) []string {
+	return []string{
+		"create",
+		patchbayServiceName,
+		"binpath=",
+		serviceCommandLine(executable),
+		"start=",
+		"auto",
+		"displayname=",
+		patchbayDisplayName,
+	}
+}
+
 // parseServiceState interprets sc.exe query output to determine the current
 // service state. When sc.exe reports that the service does not exist (error
 // 1060), the state is serviceNotInstalled rather than an error.

@@ -2,6 +2,7 @@ package main
 
 import (
 	"errors"
+	"reflect"
 	"testing"
 )
 
@@ -18,6 +19,23 @@ func TestServiceCommandLineSimplePath(t *testing.T) {
 	want := `"C:\patchbay\patchbay.exe" service`
 	if got != want {
 		t.Fatalf("got %q, want %q", got, want)
+	}
+}
+
+func TestServiceCreateArgsSeparatesOptionsFromValues(t *testing.T) {
+	got := serviceCreateArgs(`C:\Program Files\patchbay\patchbay.exe`)
+	want := []string{
+		"create",
+		patchbayServiceName,
+		"binpath=",
+		`"C:\Program Files\patchbay\patchbay.exe" service`,
+		"start=",
+		"auto",
+		"displayname=",
+		patchbayDisplayName,
+	}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("serviceCreateArgs() = %#v, want %#v", got, want)
 	}
 }
 

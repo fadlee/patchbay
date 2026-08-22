@@ -21,31 +21,54 @@ func TestSelectTrayModeClientWhenInstalled(t *testing.T) {
 	}
 }
 
-func TestEnableServiceTransitionsTrayToClient(t *testing.T) {
+func TestEnableServiceReleasesLocalRuntimeBeforeServiceStart(t *testing.T) {
 	var calls []string
 	installFn := func(_ string) error { calls = append(calls, "install"); return nil }
-	startFn := func() error { calls = append(calls, "start"); return nil }
+	stopLocalFn := func() { calls = append(calls, "stop-local") }
+	startFn := func() error { calls = append(calls, "start-service"); return nil }
+	cleanupFn := func() error { calls = append(calls, "cleanup-service"); return nil }
+	startLocalFn := func() error { calls = append(calls, "start-local"); return nil }
 
-	if err := doEnableService(installFn, startFn, "test.exe"); err != nil {
+	if err := doEnableService(installFn, stopLocalFn, startFn, cleanupFn, startLocalFn, "test.exe"); err != nil {
 		t.Fatalf("doEnableService: %v", err)
 	}
 
-	want := []string{"install", "start"}
+	want := []string{"install", "stop-local", "start-service"}
 	if !reflect.DeepEqual(calls, want) {
 		t.Fatalf("calls = %v, want %v", calls, want)
 	}
 }
 
-func TestEnableServiceFailsOnInstallError(t *testing.T) {
-	installFn := func(_ string) error { return errors.New("access denied") }
-	startFn := func() error {
-		t.Fatal("start should not be called when install fails")
+func TestEnableServiceRestoresLocalRuntimeAfterFailedStart(t *testing.T) {
+	var calls []string
+	installFn := func(_ string) error { calls = append(calls, "install"); return nil }
+	stopLocalFn := func() { calls = append(calls, "stop-local") }
+	startFn := func() error { calls = append(calls, "start-service"); return errors.New("bind failed") }
+	cleanupFn := func() error { calls = append(calls, "cleanup-service"); return nil }
+	startLocalFn := func() error { calls = append(calls, "start-local"); return nil }
+
+	if err := doEnableService(installFn, stopLocalFn, startFn, cleanupFn, startLocalFn, "test.exe"); err == nil {
+		t.Fatal("doEnableService should fail when service start fails")
+	}
+
+	want := []string{"install", "stop-local", "start-service", "cleanup-service", "start-local"}
+	if !reflect.DeepEqual(calls, want) {
+		t.Fatalf("calls = %v, want %v", calls, want)
+	}
+}
+
+func TestEnableServiceDoesNotRestoreLocalRuntimeWhenCleanupFails(t *testing.T) {
+	installFn := func(_ string) error { return nil }
+	stopLocalFn := func() {}
+	startFn := func() error { return errors.New("bind failed") }
+	cleanupFn := func() error { return errors.New("service may still be running") }
+	startLocalFn := func() error {
+		t.Fatal("local runtime must not be restored while service cleanup fails")
 		return nil
 	}
 
-	err := doEnableService(installFn, startFn, "test.exe")
-	if err == nil {
-		t.Fatal("doEnableService should fail when install fails")
+	if err := doEnableService(installFn, stopLocalFn, startFn, cleanupFn, startLocalFn, "test.exe"); err == nil {
+		t.Fatal("doEnableService should surface cleanup failure")
 	}
 }
 
@@ -54,7 +77,7 @@ func TestDisableServiceTransitionsToLocal(t *testing.T) {
 	stopFn := func() error { calls = append(calls, "stop"); return nil }
 	deleteFn := func() error { calls = append(calls, "delete"); return nil }
 
-	if err := doDisableService(stopFn, deleteFn); err != nil {
+	if err := doDisableService(serviceRunning, stopFn, deleteFn); err != nil {
 		t.Fatalf("doDisableService: %v", err)
 	}
 
@@ -64,11 +87,27 @@ func TestDisableServiceTransitionsToLocal(t *testing.T) {
 	}
 }
 
+func TestDisableStoppedServiceDeletesWithoutStopping(t *testing.T) {
+	stopFn := func() error {
+		t.Fatal("stop should not be called for an already-stopped service")
+		return nil
+	}
+	deleted := false
+	deleteFn := func() error { deleted = true; return nil }
+
+	if err := doDisableService(serviceStopped, stopFn, deleteFn); err != nil {
+		t.Fatalf("doDisableService: %v", err)
+	}
+	if !deleted {
+		t.Fatal("stopped service should still be deleted")
+	}
+}
+
 func TestDisableFailureKeepsServiceClientMode(t *testing.T) {
 	stopFn := func() error { return nil }
 	deleteFn := func() error { return errors.New("access denied") }
 
-	err := doDisableService(stopFn, deleteFn)
+	err := doDisableService(serviceRunning, stopFn, deleteFn)
 	if err == nil {
 		t.Fatal("doDisableService should fail when delete fails")
 	}
@@ -81,7 +120,7 @@ func TestDisableServiceFailsOnStopError(t *testing.T) {
 		return nil
 	}
 
-	err := doDisableService(stopFn, deleteFn)
+	err := doDisableService(serviceRunning, stopFn, deleteFn)
 	if err == nil {
 		t.Fatal("doDisableService should fail when stop fails")
 	}

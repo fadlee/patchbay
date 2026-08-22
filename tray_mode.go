@@ -22,26 +22,36 @@ func selectTrayMode(state serviceState) trayMode {
 	return trayModeClient
 }
 
-// doEnableService implements the enable-service-mode flow: install the
-// service with automatic startup, then start it. The install and start
-// functions are injected for testability.
-func doEnableService(installFn func(string) error, startFn func() error, executable string) error {
+// doEnableService transfers port ownership from the local runtime to the
+// service. The service is installed before local listeners are released. If
+// service start fails, the service is removed and the local runtime restored;
+// a cleanup failure leaves local listeners stopped to avoid a port collision.
+func doEnableService(installFn func(string) error, stopLocalFn func(), startFn func() error, cleanupFn func() error, startLocalFn func() error, executable string) error {
 	if err := installFn(executable); err != nil {
 		return fmt.Errorf("install: %w", err)
 	}
+
+	stopLocalFn()
 	if err := startFn(); err != nil {
+		if cleanupErr := cleanupFn(); cleanupErr != nil {
+			return fmt.Errorf("start: %v; cleanup failed: %w", err, cleanupErr)
+		}
+		if restoreErr := startLocalFn(); restoreErr != nil {
+			return fmt.Errorf("start: %v; restore local runtime: %w", err, restoreErr)
+		}
 		return fmt.Errorf("start: %w", err)
 	}
 	return nil
 }
 
-// doDisableService implements the disable-service-mode flow: stop the
-// service, then delete it. Both functions are injected for testability.
-// If either step fails, the error is returned and the caller must keep
-// the tray in service-client mode rather than falling back to local.
-func doDisableService(stopFn func() error, deleteFn func() error) error {
-	if err := stopFn(); err != nil {
-		return fmt.Errorf("stop: %w", err)
+// doDisableService removes the service. A running service must be stopped
+// first; an already-stopped service can be deleted immediately. If either
+// required step fails, the tray must remain in service-client mode.
+func doDisableService(state serviceState, stopFn func() error, deleteFn func() error) error {
+	if state == serviceRunning {
+		if err := stopFn(); err != nil {
+			return fmt.Errorf("stop: %w", err)
+		}
 	}
 	if err := deleteFn(); err != nil {
 		return fmt.Errorf("delete: %w", err)

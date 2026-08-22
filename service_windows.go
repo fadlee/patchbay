@@ -13,11 +13,7 @@ func queryService() (serviceState, error) {
 }
 
 func installService(executable string) error {
-	binPath := serviceCommandLine(executable)
-	if _, err := serviceRunner.Run("sc.exe", "create", patchbayServiceName,
-		fmt.Sprintf("binpath= %s", binPath),
-		"start= auto",
-		fmt.Sprintf("displayname= %s", patchbayDisplayName)); err != nil {
+	if _, err := serviceRunner.Run("sc.exe", serviceCreateArgs(executable)...); err != nil {
 		return fmt.Errorf("sc create failed: %w", err)
 	}
 	if _, err := serviceRunner.Run("sc.exe", "description", patchbayServiceName, patchbayServiceDesc); err != nil {
