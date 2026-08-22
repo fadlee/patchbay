@@ -128,3 +128,45 @@ func waitForState(target serviceState, timeout time.Duration, query func() (serv
 	}
 	return fmt.Errorf("timed out waiting for service to become %s", target)
 }
+
+// cleanupFailedServiceStart returns service ownership to the tray after a
+// genuine startup failure. It never deletes while SCM reports a transitional
+// state: wait for startup/shutdown to settle, stop a running service, then
+// remove its registration.
+func cleanupFailedServiceStart(query func() (serviceState, error), stop func() error, deleteFn func() error) error {
+	state, err := waitForStableServiceState(query, 15*time.Second)
+	if err != nil {
+		return err
+	}
+	switch state {
+	case serviceNotInstalled:
+		return nil
+	case serviceRunning:
+		if err := stop(); err != nil {
+			return fmt.Errorf("stop: %w", err)
+		}
+	case serviceStopped:
+		// Already safe to delete.
+	default:
+		return fmt.Errorf("service remained %s", state)
+	}
+	if err := deleteFn(); err != nil {
+		return fmt.Errorf("delete: %w", err)
+	}
+	return nil
+}
+
+func waitForStableServiceState(query func() (serviceState, error), timeout time.Duration) (serviceState, error) {
+	deadline := time.Now().Add(timeout)
+	for time.Now().Before(deadline) {
+		state, err := query()
+		if err != nil {
+			return serviceNotInstalled, err
+		}
+		if state != serviceStartPending && state != serviceStopPending {
+			return state, nil
+		}
+		time.Sleep(500 * time.Millisecond)
+	}
+	return serviceNotInstalled, fmt.Errorf("timed out waiting for service state to settle")
+}

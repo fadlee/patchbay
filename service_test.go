@@ -101,6 +101,60 @@ func TestWaitForStateContinuesThroughStartPending(t *testing.T) {
 	}
 }
 
+func TestCleanupFailedServiceStartStopsRunningBeforeDelete(t *testing.T) {
+	var calls []string
+	query := func() (serviceState, error) { return serviceRunning, nil }
+	stop := func() error { calls = append(calls, "stop"); return nil }
+	delete := func() error { calls = append(calls, "delete"); return nil }
+
+	if err := cleanupFailedServiceStart(query, stop, delete); err != nil {
+		t.Fatalf("cleanupFailedServiceStart: %v", err)
+	}
+	if want := []string{"stop", "delete"}; !reflect.DeepEqual(calls, want) {
+		t.Fatalf("calls = %v, want %v", calls, want)
+	}
+}
+
+func TestCleanupFailedServiceStartDeletesStoppedService(t *testing.T) {
+	query := func() (serviceState, error) { return serviceStopped, nil }
+	stop := func() error {
+		t.Fatal("stop should not be called for a stopped service")
+		return nil
+	}
+	deleted := false
+	delete := func() error { deleted = true; return nil }
+
+	if err := cleanupFailedServiceStart(query, stop, delete); err != nil {
+		t.Fatalf("cleanupFailedServiceStart: %v", err)
+	}
+	if !deleted {
+		t.Fatal("stopped service should be deleted")
+	}
+}
+
+func TestCleanupFailedServiceStartWaitsForStartPending(t *testing.T) {
+	states := []serviceState{serviceStartPending, serviceStopped}
+	calls := 0
+	query := func() (serviceState, error) {
+		state := states[calls]
+		calls++
+		return state, nil
+	}
+	stop := func() error {
+		t.Fatal("stop should not be called when startup ends stopped")
+		return nil
+	}
+	deleted := false
+	delete := func() error { deleted = true; return nil }
+
+	if err := cleanupFailedServiceStart(query, stop, delete); err != nil {
+		t.Fatalf("cleanupFailedServiceStart: %v", err)
+	}
+	if calls != 2 || !deleted {
+		t.Fatalf("query calls = %d, deleted = %t; want 2, true", calls, deleted)
+	}
+}
+
 func TestWaitForStateContinuesThroughStopPending(t *testing.T) {
 	states := []serviceState{serviceStopPending, serviceStopped}
 	calls := 0

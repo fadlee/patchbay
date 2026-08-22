@@ -108,7 +108,9 @@ func runTray() error {
 			if err != nil {
 				return fmt.Errorf("resolve executable: %w", err)
 			}
-			if err := doEnableService(installService, stopLocalRuntime, startService, deleteService, startLocalRuntime, exe); err != nil {
+			if err := doEnableService(installService, stopLocalRuntime, startService, func() error {
+				return cleanupFailedServiceStart(queryService, stopService, deleteService)
+			}, startLocalRuntime, exe); err != nil {
 				return err
 			}
 			setClientMode(serviceRunning)
