@@ -20,6 +20,7 @@ const (
 	serviceNotInstalled serviceState = iota
 	serviceStopped
 	serviceRunning
+	serviceStopPending
 )
 
 func (s serviceState) String() string {
@@ -30,6 +31,8 @@ func (s serviceState) String() string {
 		return "stopped"
 	case serviceRunning:
 		return "running"
+	case serviceStopPending:
+		return "stopping"
 	default:
 		return "unknown"
 	}
@@ -92,6 +95,9 @@ func parseServiceState(output []byte, err error) (serviceState, error) {
 	}
 	if strings.Contains(s, "RUNNING") {
 		return serviceRunning, nil
+	}
+	if strings.Contains(s, "STOP_PENDING") {
+		return serviceStopPending, nil
 	}
 	if strings.Contains(s, "STOPPED") {
 		return serviceStopped, nil

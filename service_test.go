@@ -4,6 +4,7 @@ import (
 	"errors"
 	"reflect"
 	"testing"
+	"time"
 )
 
 func TestServiceCommandLineQuotesExecutablePath(t *testing.T) {
@@ -58,6 +59,34 @@ func TestParseServiceStateStopped(t *testing.T) {
 	}
 	if state != serviceStopped {
 		t.Fatalf("got %v, want serviceStopped", state)
+	}
+}
+
+func TestParseServiceStateStopPending(t *testing.T) {
+	output := []byte("SERVICE_NAME: PatchbayPortForwarder\n\tSTATE              : 3  STOP_PENDING\n")
+	state, err := parseServiceState(output, nil)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if state != serviceStopPending {
+		t.Fatalf("got %v, want serviceStopPending", state)
+	}
+}
+
+func TestWaitForStateContinuesThroughStopPending(t *testing.T) {
+	states := []serviceState{serviceStopPending, serviceStopped}
+	calls := 0
+	query := func() (serviceState, error) {
+		state := states[calls]
+		calls++
+		return state, nil
+	}
+
+	if err := waitForState(serviceStopped, time.Second, query); err != nil {
+		t.Fatalf("waitForState: %v", err)
+	}
+	if calls != 2 {
+		t.Fatalf("query calls = %d, want 2", calls)
 	}
 }
 
