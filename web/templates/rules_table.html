@@ -1,0 +1,45 @@
+{{define "rules_table.html"}}
+<span id="summary-inner" style="display:none">{{template "summary_inner.html" .}}</span>
+
+{{if .Rules}}
+<div class="rules">
+  {{range .Rules}}
+  <div class="rule {{if .Running}}is-running{{else}}is-stopped{{end}}">
+
+    <div class="circuit">
+      <span class="jack" title="listen"></span>
+      <span class="cable"></span>
+      <span class="jack" title="target"></span>
+    </div>
+
+    <div class="meta">
+      <div class="name">{{.Name}}</div>
+      <div class="stats">
+        <span class="badge">{{.Protocol}}</span>
+        <span>{{.ListenAddr}}:{{.ListenPort}} &rarr; {{.TargetAddr}}:{{.TargetPort}}</span>
+        {{if .Running}}<span>&middot; {{.Stats.ActiveConns}} active &middot; {{.Stats.TotalConns}} total</span>{{end}}
+      </div>
+    </div>
+
+    <div class="actions">
+      <span class="status-pill">{{statusLabel .Running}}</span>
+      <form hx-post="/rules/toggle" hx-target="#rules-container" hx-swap="innerHTML" style="display:inline">
+        <input type="hidden" name="id" value="{{.ID}}">
+        <button type="submit">{{if .Enabled}}stop{{else}}start{{end}}</button>
+      </form>
+      <form hx-post="/rules/delete" hx-target="#rules-container" hx-swap="innerHTML" style="display:inline"
+            hx-confirm="Remove rule &quot;{{.Name}}&quot;?">
+        <input type="hidden" name="id" value="{{.ID}}">
+        <button type="submit" class="danger">remove</button>
+      </form>
+    </div>
+
+  </div>
+  {{end}}
+</div>
+{{else}}
+<div class="empty">No rules patched yet &mdash; add one below to start forwarding traffic.</div>
+{{end}}
+{{end}}
+
+{{define "summary_inner.html"}}<strong>{{len .Rules}}</strong> rules &middot; <strong>{{.RunningCount}}</strong> running{{end}}

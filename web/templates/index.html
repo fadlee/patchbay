@@ -1,0 +1,74 @@
+{{define "index.html"}}
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>patchbay</title>
+  <link rel="stylesheet" href="/static/style.css">
+  <script src="/static/htmx.min.js"></script>
+</head>
+<body>
+  <div class="shell">
+
+    <div class="header">
+      <div class="brand">
+        <div class="mark">patch<span class="dot">&bull;</span>bay</div>
+        <div class="tagline">// tcp/udp forwarding, wired plainly</div>
+      </div>
+      <div class="summary" id="summary" hx-get="/partials/rules" hx-trigger="every 3s" hx-select="#summary-inner" hx-target="this" hx-swap="innerHTML">
+        <span id="summary-inner">{{template "summary_inner.html" .}}</span>
+      </div>
+    </div>
+
+    <div class="divider"></div>
+
+    <div class="bay-label">active jacks</div>
+
+    <div id="rules-container"
+         hx-get="/partials/rules"
+         hx-trigger="every 3s"
+         hx-swap="innerHTML">
+      {{template "rules_table.html" .}}
+    </div>
+
+    <form class="add-form"
+          hx-post="/rules"
+          hx-target="#rules-container"
+          hx-swap="innerHTML"
+          hx-on::after-request="if(event.detail.successful) this.reset()">
+      <div class="bay-label">patch a new rule</div>
+      <div class="form-grid">
+        <div class="field">
+          <label for="name">name</label>
+          <input id="name" name="name" type="text" placeholder="e.g. rdp-relay" maxlength="60">
+        </div>
+        <div class="field">
+          <label for="protocol">protocol</label>
+          <select id="protocol" name="protocol">
+            <option value="tcp">TCP</option>
+            <option value="udp">UDP</option>
+            <option value="tcp+udp">TCP+UDP</option>
+          </select>
+        </div>
+        <div class="field">
+          <label for="listen_port">listen port</label>
+          <input id="listen_port" name="listen_port" type="number" min="1" max="65535" placeholder="3050" required>
+        </div>
+        <div class="field">
+          <label for="target_addr">target host</label>
+          <input id="target_addr" name="target_addr" type="text" placeholder="192.168.1.100" required>
+        </div>
+        <div class="field">
+          <label for="target_port">target port</label>
+          <input id="target_port" name="target_port" type="number" min="1" max="65535" placeholder="3050" required>
+        </div>
+        <button class="submit-btn" type="submit">+ add rule</button>
+      </div>
+      <input type="hidden" name="listen_addr" value="0.0.0.0">
+    </form>
+
+  </div>
+</body>
+</html>
+{{end}}
