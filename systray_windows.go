@@ -27,19 +27,27 @@ const (
 	nifIcon    = 0x00000002
 	nifTip     = 0x00000004
 
-	mfString = 0x00000000
+	mfString    = 0x00000000
+	mfSeparator = 0x00000800
+	mfDisabled  = 0x00000002
+	mfGrayed    = 0x00000001
 
 	tpmRightButton = 0x0002
 	tpmReturnCmd   = 0x0100
 	tpmBottomAlign = 0x0020
 
-	idMenuOpen = 1001
-	idMenuQuit = 1002
+	idMenuOpen    = 1001
+	idMenuQuit    = 1002
+	idMenuStart   = 1003
+	idMenuStop    = 1004
+	idMenuEnable  = 1005
+	idMenuDisable = 1006
+
+	mbIconError = 0x00000010
 
 	imageIcon      = 1
 	lrDefaultColor = 0x00000000
 )
-
 var (
 	user32   = syscall.NewLazyDLL("user32.dll")
 	shell32  = syscall.NewLazyDLL("shell32.dll")
@@ -61,6 +69,7 @@ var (
 	procDestroyMenu              = user32.NewProc("DestroyMenu")
 	procCreateIconFromResourceEx = user32.NewProc("CreateIconFromResourceEx")
 	procPostMessageW             = user32.NewProc("PostMessageW")
+	procMessageBoxW              = user32.NewProc("MessageBoxW")
 
 	procShellNotifyIconW = shell32.NewProc("Shell_NotifyIconW")
 
@@ -116,10 +125,9 @@ type notifyIconData struct {
 
 // trayApp holds the running systray state.
 type trayApp struct {
-	hwnd   syscall.Handle
-	icon   syscall.Handle
-	onOpen func()
-	onQuit func()
+	hwnd syscall.Handle
+	icon syscall.Handle
+	cfg  *trayConfig
 }
 
 var activeTray *trayApp
@@ -127,7 +135,8 @@ var activeTray *trayApp
 // runSystray creates the tray icon and blocks in the Win32 message loop
 // until Quit is selected or the window is destroyed. Call it from its own
 // goroutine locked to the OS thread (see main.go).
-func runSystray(tooltip string, onOpen func(), onQuit func()) error {
+func runSystray(cfg *trayConfig) error {
+
 	className := syscall.StringToUTF16Ptr("PortalTrayWindowClass")
 
 	hInstance, _, _ := procGetModuleHandleW.Call(0)
@@ -159,7 +168,7 @@ func runSystray(tooltip string, onOpen func(), onQuit func()) error {
 
 	icon := loadTrayIcon()
 
-	app := &trayApp{hwnd: syscall.Handle(hwnd), icon: icon, onOpen: onOpen, onQuit: onQuit}
+	app := &trayApp{hwnd: syscall.Handle(hwnd), icon: icon, cfg: cfg}
 	activeTray = app
 
 	nid := notifyIconData{
@@ -170,7 +179,7 @@ func runSystray(tooltip string, onOpen func(), onQuit func()) error {
 		hIcon:            icon,
 	}
 	nid.cbSize = uint32(unsafe.Sizeof(nid))
-	copyStringToUTF16(nid.szTip[:], tooltip)
+	copyStringToUTF16(nid.szTip[:], cfg.Tooltip)
 
 	procShellNotifyIconW.Call(nimAdd, uintptr(unsafe.Pointer(&nid)))
 	defer procShellNotifyIconW.Call(nimDelete, uintptr(unsafe.Pointer(&nid)))
@@ -221,14 +230,38 @@ func trayWndProc(hwnd syscall.Handle, message uint32, wParam, lParam uintptr) ui
 		id := int(loWord(wParam))
 		switch id {
 		case idMenuOpen:
-			if app != nil && app.onOpen != nil {
-				app.onOpen()
+			if app != nil && app.cfg.OnOpen != nil {
+				app.cfg.OnOpen()
 			}
 		case idMenuQuit:
-			if app != nil && app.onQuit != nil {
-				app.onQuit()
+			if app != nil && app.cfg.OnQuit != nil {
+				app.cfg.OnQuit()
 			}
 			procPostQuitMessage.Call(0)
+		case idMenuStart:
+			if app != nil && app.cfg.OnStartService != nil {
+				if err := app.cfg.OnStartService(); err != nil {
+					showTrayError(hwnd, "Start service failed", err.Error())
+				}
+			}
+		case idMenuStop:
+			if app != nil && app.cfg.OnStopService != nil {
+				if err := app.cfg.OnStopService(); err != nil {
+					showTrayError(hwnd, "Stop service failed", err.Error())
+				}
+			}
+		case idMenuEnable:
+			if app != nil && app.cfg.OnEnableService != nil {
+				if err := app.cfg.OnEnableService(); err != nil {
+					showTrayError(hwnd, "Enable service mode failed", err.Error())
+				}
+			}
+		case idMenuDisable:
+			if app != nil && app.cfg.OnDisableService != nil {
+				if err := app.cfg.OnDisableService(); err != nil {
+					showTrayError(hwnd, "Disable service mode failed", err.Error())
+				}
+			}
 		}
 		return 0
 
@@ -242,10 +275,27 @@ func trayWndProc(hwnd syscall.Handle, message uint32, wParam, lParam uintptr) ui
 }
 
 func showTrayMenu(hwnd syscall.Handle) {
+	app := activeTray
 	hMenu, _, _ := procCreatePopupMenu.Call()
 	defer procDestroyMenu.Call(hMenu)
 
 	procAppendMenuW.Call(hMenu, mfString, idMenuOpen, uintptr(unsafe.Pointer(syscall.StringToUTF16Ptr("Open Dashboard"))))
+
+	if app != nil && app.cfg.Mode == trayModeClient {
+		procAppendMenuW.Call(hMenu, mfSeparator, 0, 0)
+		switch app.cfg.ServiceState {
+		case serviceRunning:
+			procAppendMenuW.Call(hMenu, mfString, idMenuStop, uintptr(unsafe.Pointer(syscall.StringToUTF16Ptr("Stop service"))))
+		case serviceStopped:
+			procAppendMenuW.Call(hMenu, mfString, idMenuStart, uintptr(unsafe.Pointer(syscall.StringToUTF16Ptr("Start service"))))
+		}
+		procAppendMenuW.Call(hMenu, mfString, idMenuDisable, uintptr(unsafe.Pointer(syscall.StringToUTF16Ptr("Disable service mode"))))
+	} else if app != nil && app.cfg.OnEnableService != nil {
+		procAppendMenuW.Call(hMenu, mfSeparator, 0, 0)
+		procAppendMenuW.Call(hMenu, mfString, idMenuEnable, uintptr(unsafe.Pointer(syscall.StringToUTF16Ptr("Enable service mode"))))
+	}
+
+	procAppendMenuW.Call(hMenu, mfSeparator, 0, 0)
 	procAppendMenuW.Call(hMenu, mfString, idMenuQuit, uintptr(unsafe.Pointer(syscall.StringToUTF16Ptr("Quit"))))
 
 	var pt point
@@ -262,6 +312,15 @@ func showTrayMenu(hwnd syscall.Handle) {
 	)
 }
 
+// showTrayError displays a Windows message box with an error title.
+func showTrayError(hwnd syscall.Handle, title, body string) {
+	procMessageBoxW.Call(
+		uintptr(hwnd),
+		uintptr(unsafe.Pointer(syscall.StringToUTF16Ptr(body))),
+		uintptr(unsafe.Pointer(syscall.StringToUTF16Ptr(title))),
+		mbIconError,
+	)
+}
 func loWord(v uintptr) uint16 {
 	return uint16(v & 0xffff)
 }

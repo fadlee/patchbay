@@ -8,7 +8,7 @@ import "log"
 // implementation (systray_windows.go) uses raw Win32 syscalls and only
 // builds for GOOS=windows. This stub exists purely so the project can be
 // built and tested on Linux/macOS during development.
-func runSystray(tooltip string, onOpen func(), onQuit func()) error {
+func runSystray(cfg *trayConfig) error {
 	log.Println("systray: not supported on this OS, skipping (dashboard still available over HTTP)")
 	select {} // block forever, like the real message loop would
 }
