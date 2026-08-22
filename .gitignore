@@ -1,3 +1,4 @@
+*.syso
 *.exe
 portforward-config.json
 /dist/

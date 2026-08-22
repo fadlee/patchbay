@@ -13,13 +13,18 @@ tasks:
       - go build -o dist/patchbay .
 
   build-windows:
-    desc: Build the Windows amd64 binary
-    deps: [ensure-dist]
+    desc: Build the Windows amd64 binary with administrator privileges
+    deps: [ensure-dist, windows-resource]
     cmds:
       - go build -o dist/patchbay-windows-amd64.exe .
     env:
       GOOS: windows
       GOARCH: amd64
+
+  windows-resource:
+    internal: true
+    cmds:
+      - go run github.com/akavel/rsrc@v0.10.2 -manifest windows.manifest -arch amd64 -o windows_amd64.syso
 
   test:
     desc: Run the Go test suite
@@ -30,3 +35,4 @@ tasks:
     desc: Remove build artifacts
     cmds:
       - '{{if eq OS "windows"}}if exist dist rmdir /s /q dist{{else}}rm -rf dist{{end}}'
+      - '{{if eq OS "windows"}}if exist windows_amd64.syso del /q windows_amd64.syso{{else}}rm -f windows_amd64.syso{{end}}'
