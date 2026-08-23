@@ -16,7 +16,7 @@ tasks:
     desc: Build the Windows amd64 binary with administrator privileges
     deps: [ensure-dist, windows-resource]
     cmds:
-      - go build -ldflags "-H=windowsgui" -o dist/patchbay-windows-amd64.exe .
+      - go build -ldflags "-H=windowsgui {{if .VERSION}}-X main.Version={{.VERSION}}{{end}}" -o dist/patchbay-windows-amd64.exe .
     env:
       GOOS: windows
       GOARCH: amd64
@@ -25,7 +25,7 @@ tasks:
     desc: Build the Windows NSIS setup installer (requires makensis)
     deps: [build-windows]
     cmds:
-      - makensis installer.nsi
+      - makensis {{if .VERSION}}-DPRODUCT_VERSION="{{.VERSION}}"{{end}} installer.nsi
   windows-resource:
     internal: true
     cmds:

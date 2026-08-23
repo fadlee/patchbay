@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -160,5 +161,66 @@ func TestConfigLoggingToggleEndpoint(t *testing.T) {
 	}
 	if logger.IsEnabled() {
 		t.Fatal("logger should be disabled after toggle endpoint called")
+	}
+}
+
+func TestAPIUpdateCheck(t *testing.T) {
+	store, err := NewConfigStore(t.TempDir() + "/config.json")
+	if err != nil {
+		t.Fatalf("failed to create config store: %v", err)
+	}
+
+	tsMock := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		rel := ghRelease{
+			TagName: "v2.0.0",
+			HTMLURL: "https://github.com/fadlee/patchbay/releases/tag/v2.0.0",
+			Body:    "Major release",
+			Assets: []ghAsset{
+				{
+					Name:               "patchbay-setup-amd64.exe",
+					Size:               5000,
+					BrowserDownloadURL: "http://example.com/patchbay-setup-amd64.exe",
+				},
+			},
+		}
+		_ = json.NewEncoder(w).Encode(rel)
+	}))
+	defer tsMock.Close()
+
+	updater := &Updater{
+		repo:    "fadlee/patchbay",
+		baseURL: tsMock.URL,
+		client:  tsMock.Client(),
+	}
+
+	app := NewApp(store, NewManager(), nil, nil)
+	app.SetUpdater(updater)
+
+	srv := httptest.NewServer(app.Routes())
+	defer srv.Close()
+
+	resp, err := http.Get(srv.URL + "/api/update/check")
+	if err != nil {
+		t.Fatalf("failed to GET update check: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("expected status 200, got %d", resp.StatusCode)
+	}
+
+	var info UpdateInfo
+	if err := json.NewDecoder(resp.Body).Decode(&info); err != nil {
+		t.Fatalf("failed to decode response: %v", err)
+	}
+
+	if !info.UpdateAvail {
+		t.Errorf("expected update available, got false")
+	}
+	if info.LatestVersion != "2.0.0" {
+		t.Errorf("expected latest version 2.0.0, got %s", info.LatestVersion)
+	}
+	if info.AssetName != "patchbay-setup-amd64.exe" {
+		t.Errorf("expected asset name patchbay-setup-amd64.exe, got %s", info.AssetName)
 	}
 }

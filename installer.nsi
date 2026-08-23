@@ -2,8 +2,9 @@
 ; Generates a lightweight, professional 64-bit Windows setup executable
 
 !define PRODUCT_NAME "Patchbay"
-!define PRODUCT_VERSION "1.0.0"
-!define PRODUCT_PUBLISHER "Patchbay Project"
+!ifndef PRODUCT_VERSION
+  !define PRODUCT_VERSION "1.0.0"
+!endif
 !define PRODUCT_WEB_SITE "https://github.com/fadlee/patchbay"
 !define PRODUCT_EXE "patchbay.exe"
 !define PRODUCT_UNINST_KEY "Software\Microsoft\Windows\CurrentVersion\Uninstall\${PRODUCT_NAME}"

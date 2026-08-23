@@ -92,6 +92,20 @@ func runTray() error {
 		ServiceState: svcState,
 		OnOpen:       func() { openBrowser(dashboardURL) },
 	}
+	trayCfg.OnCheckUpdate = func() {
+		go func() {
+			u := NewUpdater("")
+			info, err := u.Check(context.Background())
+			if err != nil {
+				log.Printf("Update check failed: %v", err)
+				return
+			}
+			if info.UpdateAvail {
+				// Open dashboard so user can review and apply update
+				openBrowser(dashboardURL)
+			}
+		}()
+	}
 	trayCfg.OnQuit = func() { stopLocalRuntime(); os.Exit(0) }
 
 	var setLocalMode func()

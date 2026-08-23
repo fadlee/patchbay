@@ -601,3 +601,57 @@ button.danger:hover {
 @media (max-width: 720px) {
   .form-grid { grid-template-columns: 1fr 1fr; }
 }
+
+/* Update banner */
+.update-banner {
+  margin-top: 16px;
+  padding: 10px 16px;
+  background: var(--surface-raised);
+  border: 1px solid var(--signal);
+  border-radius: var(--radius);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  animation: fadeIn 0.3s ease-in-out;
+}
+
+.update-info {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 13px;
+}
+
+.update-badge {
+  font-family: var(--mono);
+  font-size: 10px;
+  font-weight: bold;
+  padding: 2px 6px;
+  background: var(--signal);
+  color: var(--bg);
+  border-radius: 3px;
+  letter-spacing: 0.5px;
+}
+
+.update-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.action-apply-update {
+  background: var(--signal);
+  color: var(--bg);
+  border-color: var(--signal);
+  font-weight: 600;
+}
+
+.action-apply-update:hover {
+  filter: brightness(1.1);
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(-4px); }
+  to { opacity: 1; transform: translateY(0); }
+}

@@ -29,6 +29,16 @@
         <button class="theme-toggle" type="button" id="theme-toggle" aria-label="Switch to dark mode">dark mode</button>
       </div>
     </header>
+    <div id="update-banner" class="update-banner" style="display: none;">
+      <div class="update-info">
+        <span class="update-badge">UPDATE</span>
+        <span id="update-text">A new version is available!</span>
+      </div>
+      <div class="update-actions">
+        <a id="update-changelog-link" href="#" target="_blank" class="action-btn">Release Notes</a>
+        <button id="update-apply-btn" type="button" class="action-btn action-apply-update">Update & Restart</button>
+      </div>
+    </div>
     <script>
       const themeToggle = document.getElementById('theme-toggle');
       const setTheme = (theme) => {

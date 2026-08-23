@@ -42,7 +42,7 @@ const (
 	idMenuStop    = 1004
 	idMenuEnable  = 1005
 	idMenuDisable = 1006
-
+	idMenuUpdate  = 1007
 	mbIconError = 0x00000010
 	mbIconInfo  = 0x00000040
 	imageIcon      = 1
@@ -233,6 +233,10 @@ func trayWndProc(hwnd syscall.Handle, message uint32, wParam, lParam uintptr) ui
 			if app != nil && app.cfg.OnOpen != nil {
 				app.cfg.OnOpen()
 			}
+		case idMenuUpdate:
+			if app != nil && app.cfg.OnCheckUpdate != nil {
+				app.cfg.OnCheckUpdate()
+			}
 		case idMenuQuit:
 			if app != nil && app.cfg.OnQuit != nil {
 				app.cfg.OnQuit()
@@ -284,9 +288,8 @@ func trayWndProc(hwnd syscall.Handle, message uint32, wParam, lParam uintptr) ui
 func showTrayMenu(hwnd syscall.Handle) {
 	app := activeTray
 	hMenu, _, _ := procCreatePopupMenu.Call()
-	defer procDestroyMenu.Call(hMenu)
-
 	procAppendMenuW.Call(hMenu, mfString, idMenuOpen, uintptr(unsafe.Pointer(syscall.StringToUTF16Ptr("Open Dashboard"))))
+	procAppendMenuW.Call(hMenu, mfString, idMenuUpdate, uintptr(unsafe.Pointer(syscall.StringToUTF16Ptr("Check for Updates..."))))
 
 	if app != nil && app.cfg.Mode == trayModeClient {
 		procAppendMenuW.Call(hMenu, mfSeparator, 0, 0)

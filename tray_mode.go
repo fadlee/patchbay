@@ -86,7 +86,7 @@ type trayConfig struct {
 	DashboardURL string
 	OnOpen       func()
 	OnQuit       func()
-
+	OnCheckUpdate func()
 	Mode         trayMode
 	ServiceState serviceState
 

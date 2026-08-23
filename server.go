@@ -10,14 +10,13 @@ import (
 	"io/fs"
 	"log"
 	"net/http"
+	"os"
 	"strconv"
 	"strings"
 	"time"
 )
-
 //go:embed web/templates/*.html
 var templateFS embed.FS
-
 //go:embed web/static/*
 var staticFS embed.FS
 
@@ -29,6 +28,7 @@ type App struct {
 	manager *Manager
 	logger  *TrafficLogger
 	hub     *SSEHub
+	updater *Updater
 }
 
 func NewApp(store *ConfigStore, manager *Manager, logger *TrafficLogger, hub *SSEHub) *App {
@@ -37,7 +37,12 @@ func NewApp(store *ConfigStore, manager *Manager, logger *TrafficLogger, hub *SS
 		manager: manager,
 		logger:  logger,
 		hub:     hub,
+		updater: NewUpdater(""),
 	}
+}
+
+func (a *App) SetUpdater(u *Updater) {
+	a.updater = u
 }
 
 // ruleView is what JSON API / templates serialize — a Rule plus its live status.
@@ -85,6 +90,8 @@ func (a *App) Routes() http.Handler {
 	mux.HandleFunc("/api/logs", a.handleAPILogs)
 	mux.HandleFunc("/api/config", a.handleAPIConfig)
 	mux.HandleFunc("/api/config/logging", a.handleAPIToggleLogging)
+	mux.HandleFunc("/api/update/check", a.handleAPIUpdateCheck)
+	mux.HandleFunc("/api/update/apply", a.handleAPIUpdateApply)
 	return mux
 }
 
@@ -339,6 +346,75 @@ func (a *App) handleAPIToggleLogging(w http.ResponseWriter, r *http.Request) {
 		a.logger.SetEnabled(newVal)
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"logging_enabled": newVal})
+}
+func (a *App) handleAPIUpdateCheck(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	updater := a.updater
+	if updater == nil {
+		updater = NewUpdater("")
+	}
+	info, err := updater.Check(r.Context())
+	if err != nil {
+		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
+		return
+	}
+	writeJSON(w, http.StatusOK, info)
+}
+
+func (a *App) handleAPIUpdateApply(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	var req struct {
+		AssetURL string `json:"asset_url"`
+	}
+	_ = json.NewDecoder(r.Body).Decode(&req)
+
+	updater := a.updater
+	if updater == nil {
+		updater = NewUpdater("")
+	}
+
+	assetURL := req.AssetURL
+	if assetURL == "" {
+		info, err := updater.Check(r.Context())
+		if err != nil {
+			writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "check update: " + err.Error()})
+			return
+		}
+		if !info.UpdateAvail || info.AssetURL == "" {
+			writeJSON(w, http.StatusBadRequest, map[string]string{"error": "no suitable update asset found"})
+			return
+		}
+		assetURL = info.AssetURL
+	}
+
+	// Download asset
+	tmpFile, err := updater.DownloadAsset(r.Context(), assetURL, nil)
+	if err != nil {
+		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "download update: " + err.Error()})
+		return
+	}
+
+	if err := LaunchInstaller(tmpFile); err != nil {
+		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "launch installer: " + err.Error()})
+		return
+	}
+
+	writeJSON(w, http.StatusOK, map[string]string{
+		"status":  "installing",
+		"message": "Installer launched. Application will exit to apply update.",
+	})
+
+	// Allow response to be flushed before exiting
+	go func() {
+		time.Sleep(1 * time.Second)
+		os.Exit(0)
+	}()
 }
 
 func writeJSON(w http.ResponseWriter, status int, data any) {

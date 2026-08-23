@@ -533,6 +533,67 @@
     });
   }
 
+  // Auto-Update feature
+  const updateBannerEl = document.getElementById('update-banner');
+  const updateTextEl = document.getElementById('update-text');
+  const updateChangelogLinkEl = document.getElementById('update-changelog-link');
+  const updateApplyBtnEl = document.getElementById('update-apply-btn');
+  let updateAssetURL = '';
+
+  async function checkUpdate() {
+    try {
+      const res = await fetch('/api/update/check');
+      if (!res.ok) return;
+      const info = await res.json();
+      if (info && info.update_available && updateBannerEl) {
+        updateAssetURL = info.asset_url || '';
+        if (updateTextEl) {
+          updateTextEl.textContent = `New update available: v${info.latest_version} (Current: v${info.current_version})`;
+        }
+        if (updateChangelogLinkEl && info.release_url) {
+          updateChangelogLinkEl.href = info.release_url;
+          updateChangelogLinkEl.style.display = 'inline-flex';
+        } else if (updateChangelogLinkEl) {
+          updateChangelogLinkEl.style.display = 'none';
+        }
+        if (updateApplyBtnEl) {
+          if (!info.asset_url) {
+            updateApplyBtnEl.style.display = 'none';
+          } else {
+            updateApplyBtnEl.style.display = 'inline-flex';
+          }
+        }
+        updateBannerEl.style.display = 'flex';
+      }
+    } catch (e) {
+      // Silently ignore update check errors
+    }
+  }
+
+  if (updateApplyBtnEl) {
+    updateApplyBtnEl.addEventListener('click', async () => {
+      if (!confirm('Download and install update now? Application will restart.')) return;
+      updateApplyBtnEl.disabled = true;
+      updateApplyBtnEl.textContent = 'Updating...';
+      try {
+        const res = await fetch('/api/update/apply', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ asset_url: updateAssetURL })
+        });
+        const data = await res.json();
+        if (!res.ok) {
+          throw new Error(data.error || 'Update failed');
+        }
+        alert(data.message || 'Installer launched. Please follow on-screen installer instructions.');
+      } catch (err) {
+        alert('Failed to apply update: ' + err.message);
+        updateApplyBtnEl.disabled = false;
+        updateApplyBtnEl.textContent = 'Update & Restart';
+      }
+    });
+  }
+
   window.addEventListener('resize', drawChart);
 
   // Initialize
@@ -540,6 +601,7 @@
   fetchRules();
   fetchLogs();
   initSSE();
+  checkUpdate();
   // Initial empty chart draw
   drawChart();
 })();
