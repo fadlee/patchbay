@@ -19,8 +19,12 @@ jobs:
         uses: actions/setup-go@v5
         with:
           go-version: '1.22'
-          cache: true
+          cache: false
 
+      - name: Install NSIS
+        run: |
+          choco install nsis -y --no-progress
+          echo "C:\Program Files (x86)\NSIS" >> $env:GITHUB_PATH
       - name: Extract tag version
         id: get_version
         shell: bash
