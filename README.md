@@ -1,23 +1,22 @@
 # patchbay
 
 Modern TCP/UDP port forwarder for Windows, inspired by AUTAPF (which is
-discontinued). Single `.exe`, no installer, no runtime dependencies — a
-Go binary with an embedded native Vanilla JS web dashboard, Server-Sent Events
-(SSE) realtime streaming, live traffic logging, and a native system tray icon.
+discontinued). Available as a standalone single `.exe` or a standard Windows
+NSIS setup installer. Built in Go with an embedded Vanilla JS web dashboard,
+Server-Sent Events (SSE) realtime streaming, live traffic logging, a native
+system tray icon, and automatic update capabilities via GitHub Releases.
 
 ## Features
 
-- TCP and UDP forwarding (or both on the same rule)
-- Realtime web dashboard via **Server-Sent Events (SSE)** and native **Vanilla JS**
-- Live bandwidth and connection throughput chart rendered via **HTML5 Canvas** (0 external libraries)
-- Live connection session logger with in-memory ring buffer and daily rotating file persistence (`.jsonl`)
-- System tray icon → **Open Dashboard** / **Quit**
-- Optional Windows Service mode: forwarding and dashboard survive reboots
-  without requiring a user login session
-- Rules persist to a shared config (`%ProgramData%\patchbay` on Windows)
-- Zero external dependencies — everything (including the tray icon, which
-  talks to Win32 directly via `syscall`) is Go stdlib
-
+- **TCP and UDP forwarding** (or both on the same rule)
+- **Realtime web dashboard** via **Server-Sent Events (SSE)** and native **Vanilla JS**
+- **Live bandwidth & throughput chart** rendered via **HTML5 Canvas** (0 external libraries)
+- **Live connection session logger** with in-memory ring buffer and daily rotating file persistence (`.jsonl`)
+- **Native system tray icon**: **Open Dashboard**, **Check for Updates...**, **Service controls**, **Quit**
+- **Optional Windows Service mode**: forwarding and dashboard survive reboots without requiring an active user session
+- **Built-in Auto-Update**: automatically checks latest GitHub releases with one-click update & restart in dashboard and tray
+- **Configuration persistence**: shared config in `%ProgramData%\patchbay` on Windows
+- **Zero runtime external dependencies**: everything (including tray icon & Win32 service handling) is built using Go stdlib & native Win32 APIs
 ## Build
 
 Requires Go 1.22+ and [Task](https://taskfile.dev).
@@ -77,6 +76,7 @@ The service name is `PatchbayPortForwarder`. Service management uses
 | File                       | What it does                                                 |
 |----------------------------|--------------------------------------------------------------|
 | `main.go`                  | entry point: dispatches service/tray mode, tray orchestration |
+| `updater.go`               | GitHub Releases API client, SemVer comparison, installer download |
 | `config.go`                | `Rule`/`Config` model, thread-safe JSON load/save             |
 | `config_windows.go`        | Windows shared config path (`%ProgramData%`) + migration      |
 | `config_other.go`          | non-Windows config path (executable-directory)                |
@@ -95,11 +95,11 @@ The service name is `PatchbayPortForwarder`. Service management uses
 | `tray_mode.go`             | tray mode selection and service enable/disable flows         |
 | `systray_windows.go`       | tray icon, built only for `GOOS=windows`, raw Win32 syscalls    |
 | `systray_other.go`         | no-op stub so the project builds on other OSes for dev        |
-| `web/templates/index.html` | dashboard single-page HTML layout                            |
+| `web/templates/index.html` | dashboard single-page HTML layout with update banner         |
 | `web/static/app.js`        | Vanilla JS client: SSE consumer, Canvas chart, REST actions  |
 | `web/static/style.css`     | lightweight stylesheet (light & dark theme)                  |
 | `assets/icon.png`          | tray icon (32×32), embedded into the binary                   |
-
+| `.github/workflows/release.yml` | GitHub Actions CI/CD for automated build & release        |
 ## Ideas for next steps
 
 - Auth on the dashboard (it's currently open to anyone who can reach
