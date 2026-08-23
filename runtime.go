@@ -7,10 +7,13 @@ import (
 	"log"
 	"net"
 	"net/http"
+	"os"
 	"strconv"
+	"strings"
 	"syscall"
 	"time"
 )
+
 
 // runtimeApp owns the config store, forwarding manager, HTTP dashboard, and
 // their lifecycle. Both local tray mode and Windows service mode use it.
@@ -124,13 +127,47 @@ func (rt *runtimeApp) listenDashboard() (net.Listener, error) {
 		if err == nil {
 			return ln, nil
 		}
-		if !errors.Is(err, syscall.EADDRINUSE) || !time.Now().Before(deadline) {
+		if !isAddrInUse(err) || !time.Now().Before(deadline) {
 			return nil, fmt.Errorf("dashboard listen: %w", err)
 		}
-		time.Sleep(100 * time.Millisecond)
+		time.Sleep(50 * time.Millisecond)
 	}
 }
 
+func isAddrInUse(err error) bool {
+	if err == nil {
+		return false
+	}
+	if errors.Is(err, syscall.EADDRINUSE) {
+		return true
+	}
+	var sysErr *os.SyscallError
+	if errors.As(err, &sysErr) {
+		if errors.Is(sysErr.Err, syscall.EADDRINUSE) {
+			return true
+		}
+		var errno syscall.Errno
+		if errors.As(sysErr.Err, &errno) {
+			if errno == 10048 || errno == 10013 || errno == syscall.EADDRINUSE {
+				return true
+			}
+		}
+	}
+	var errno syscall.Errno
+	if errors.As(err, &errno) {
+		if errno == 10048 || errno == 10013 || errno == syscall.EADDRINUSE {
+			return true
+		}
+	}
+	// Fallback string match for OS specific socket errors
+	errMsg := strings.ToLower(err.Error())
+	if strings.Contains(errMsg, "address already in use") ||
+		strings.Contains(errMsg, "only one usage of each socket address") ||
+		strings.Contains(errMsg, "bind:") {
+		return true
+	}
+	return false
+}
 // stop closes the HTTP dashboard listener and all forwarding rules. It is
 // safe to call multiple times.
 func (rt *runtimeApp) stop() {

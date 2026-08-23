@@ -75,6 +75,7 @@ func TestLogsJSONEndpoints(t *testing.T) {
 	store, _ := NewConfigStore(t.TempDir() + "/config.json")
 	manager := NewManager()
 	logger, _ := NewTrafficLogger(t.TempDir(), 100)
+	defer logger.Close()
 	logger.Record(LogEntry{ID: "test-log", RuleID: "r1", Status: "closed"})
 	hub := NewSSEHub()
 	app := NewApp(store, manager, logger, hub)
@@ -96,10 +97,11 @@ func TestLogsSummaryJSONEndpoint(t *testing.T) {
 	store, _ := NewConfigStore(t.TempDir() + "/config.json")
 	manager := NewManager()
 	logger, _ := NewTrafficLogger(t.TempDir(), 100)
+	defer logger.Close()
 	logger.Record(LogEntry{ID: "test-log", RuleID: "r1", BytesIn: 500, BytesOut: 1000, Status: "closed", Time: time.Now()})
+
 	hub := NewSSEHub()
 	app := NewApp(store, manager, logger, hub)
-
 	// Test GET /api/logs/summary
 	req := httptest.NewRequest(http.MethodGet, "/api/logs/summary", nil)
 	rec := httptest.NewRecorder()
@@ -117,9 +119,9 @@ func TestStaticAssetsServeVanillaAppJS(t *testing.T) {
 	store, _ := NewConfigStore(t.TempDir() + "/config.json")
 	manager := NewManager()
 	logger, _ := NewTrafficLogger(t.TempDir(), 100)
+	defer logger.Close()
 	hub := NewSSEHub()
 	app := NewApp(store, manager, logger, hub)
-
 	req := httptest.NewRequest(http.MethodGet, "/static/app.js", nil)
 	rec := httptest.NewRecorder()
 	app.Routes().ServeHTTP(rec, req)
