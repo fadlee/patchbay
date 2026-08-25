@@ -46,7 +46,11 @@ func newRuntime(store *ConfigStore, manager *Manager) *runtimeApp {
 	if logger != nil {
 		logger.SetEnabled(cfg.IsLoggingEnabled())
 	}
-	addr := "127.0.0.1:" + strconv.Itoa(cfg.AdminPort)
+	adminHost := os.Getenv("PATCHBAY_HOST")
+	if adminHost == "" {
+		adminHost = "127.0.0.1"
+	}
+	addr := net.JoinHostPort(adminHost, strconv.Itoa(cfg.AdminPort))
 	app := NewApp(store, manager, logger, hub)
 	return &runtimeApp{
 		store:                 store,

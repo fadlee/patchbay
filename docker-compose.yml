@@ -1,0 +1,15 @@
+services:
+  patchbay:
+    build: .
+    image: patchbay:latest
+    container_name: patchbay
+    restart: unless-stopped
+    ports:
+      - "8787:8787" # Admin Dashboard
+      # Tambahkan port forwarding yang ingin diexpose ke host, contoh:
+      # - "8080:8080"
+      # - "5433:5433"
+    volumes:
+      - ./data:/app
+    environment:
+      - PATCHBAY_HOST=0.0.0.0
