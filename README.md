@@ -1,13 +1,11 @@
 # patchbay
 
-Modern TCP/UDP port forwarder for Windows, inspired by AUTAPF (which is
-discontinued). Available as a standalone single `.exe` or a standard Windows
-NSIS setup installer. Built in Go with an embedded Vanilla JS web dashboard,
-Server-Sent Events (SSE) realtime streaming, live traffic logging, a native
-system tray icon, and automatic update capabilities via GitHub Releases.
+Modern TCP/UDP port forwarder and lightweight HAProxy alternative with Web UI.
+Available as a standalone Windows app/service or as a **Docker container** for Linux servers.
+Built in Go with an embedded Vanilla JS web dashboard, Server-Sent Events (SSE) realtime
+streaming, live traffic logging, and automatic update capabilities via GitHub Releases.
 
 ## Features
-
 - **TCP and UDP forwarding** (or both on the same rule)
 - **Realtime web dashboard** via **Server-Sent Events (SSE)** and native **Vanilla JS**
 - **Live bandwidth & throughput chart** rendered via **HTML5 Canvas** (0 external libraries)
@@ -45,6 +43,70 @@ On Windows, config/rules and traffic logs are stored in:
 On first run, an existing `portforward-config.json` next to the executable
 is migrated there. On non-Windows, the config and logs stay adjacent to the
 executable for development.
+
+## Run with Docker (Linux / Server)
+
+Patchbay can run seamlessly in Docker as a lightweight, visual port forwarder.
+
+### Option 1: Host Networking (Recommended to manage any host port)
+Using `network_mode: host` allows Patchbay to bind directly to any port on the host machine without needing to pre-publish `-p <port>:<port>` in Docker beforehand:
+
+```yaml
+# docker-compose.yml
+services:
+  patchbay:
+    image: ghcr.io/fadlee/patchbay:latest
+    container_name: patchbay
+    restart: unless-stopped
+    network_mode: host
+    volumes:
+      - ./data:/app
+    environment:
+      - PATCHBAY_HOST=0.0.0.0 # Binds dashboard to all network interfaces
+```
+
+Or via `docker run`:
+```bash
+docker run -d \
+  --name patchbay \
+  --restart unless-stopped \
+  --network host \
+  -v $(pwd)/data:/app \
+  -e PATCHBAY_HOST=0.0.0.0 \
+  ghcr.io/fadlee/patchbay:latest
+```
+> **Note:** Dengan mode `host`, setiap aturan forward yang Anda tambahkan di Web UI (`http://<server-ip>:8787`) akan langsung membuka dan mendengarkan port tersebut di host Linux Anda secara dinamis.
+
+---
+
+### Option 2: Bridge Networking (Port Mapping)
+Jika tidak ingin menggunakan host network, gunakan port mapping standar:
+
+```yaml
+services:
+  patchbay:
+    image: ghcr.io/fadlee/patchbay:latest
+    container_name: patchbay
+    restart: unless-stopped
+    ports:
+      - "8787:8787" # Admin Dashboard
+      # Daftarkan port forwarding yang ingin dibuka ke host:
+      - "8080:8080"
+      - "5433:5433"
+    volumes:
+      - ./data:/app
+    environment:
+      - PATCHBAY_HOST=0.0.0.0
+```
+
+---
+
+### Target Host / Container Routing
+- Untuk forward ke service di host machine dari dalam container bridge: gunakan target `host.docker.internal` (dengan `extra_hosts: ["host.docker.internal:host-gateway"]`).
+- Jika menggunakan `network_mode: host`, target ke service lokal di mesin host cukup menggunakan `127.0.0.1`.
+
+---
+
 
 ## Windows Service Mode
 

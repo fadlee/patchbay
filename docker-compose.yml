@@ -1,15 +1,19 @@
 services:
   patchbay:
-    build: .
-    image: patchbay:latest
+    image: ghcr.io/fadlee/patchbay:latest
     container_name: patchbay
     restart: unless-stopped
-    ports:
-      - "8787:8787" # Admin Dashboard
-      # Tambahkan port forwarding yang ingin diexpose ke host, contoh:
-      # - "8080:8080"
-      # - "5433:5433"
+    # Mode host memungkinkan Patchbay membuka/mendengarkan port apa saja
+    # di host Linux tanpa perlu mapping port manual satu per satu di docker-compose.
+    network_mode: host
     volumes:
       - ./data:/app
     environment:
-      - PATCHBAY_HOST=0.0.0.0
+      - PATCHBAY_HOST=0.0.0.0 # Binds admin dashboard to all interfaces
+
+    # Alternatif jika TIDAK menggunakan network_mode: host (Bridge mode):
+    # ports:
+    #   - "8787:8787" # Admin Dashboard
+    #   - "8080:8080" # Contoh Port forwarding
+    # extra_hosts:
+    #   - "host.docker.internal:host-gateway"
