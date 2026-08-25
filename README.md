@@ -1,10 +1,11 @@
 # patchbay
 
+English | [Bahasa Indonesia](README.id.md)
+
 Modern TCP/UDP port forwarder and lightweight HAProxy alternative with Web UI.
 Available as a standalone Windows app/service or as a **Docker container** for Linux servers.
 Built in Go with an embedded Vanilla JS web dashboard, Server-Sent Events (SSE) realtime
 streaming, live traffic logging, and automatic update capabilities via GitHub Releases.
-
 ## Features
 - **TCP and UDP forwarding** (or both on the same rule)
 - **Realtime web dashboard** via **Server-Sent Events (SSE)** and native **Vanilla JS**
