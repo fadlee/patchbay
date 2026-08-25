@@ -3,17 +3,17 @@ services:
     image: ghcr.io/fadlee/patchbay:latest
     container_name: patchbay
     restart: unless-stopped
-    # Mode host memungkinkan Patchbay membuka/mendengarkan port apa saja
-    # di host Linux tanpa perlu mapping port manual satu per satu di docker-compose.
+    # Host network mode allows Patchbay to dynamically bind and listen on any
+    # host port without manually mapping ports one by one in docker-compose.
     network_mode: host
     volumes:
       - ./data:/app
     environment:
       - PATCHBAY_HOST=0.0.0.0 # Binds admin dashboard to all interfaces
 
-    # Alternatif jika TIDAK menggunakan network_mode: host (Bridge mode):
+    # Alternative if NOT using network_mode: host (Bridge mode):
     # ports:
     #   - "8787:8787" # Admin Dashboard
-    #   - "8080:8080" # Contoh Port forwarding
+    #   - "8080:8080" # Example port forwarding
     # extra_hosts:
     #   - "host.docker.internal:host-gateway"

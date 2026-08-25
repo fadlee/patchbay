@@ -75,12 +75,12 @@ docker run -d \
   -e PATCHBAY_HOST=0.0.0.0 \
   ghcr.io/fadlee/patchbay:latest
 ```
-> **Note:** Dengan mode `host`, setiap aturan forward yang Anda tambahkan di Web UI (`http://<server-ip>:8787`) akan langsung membuka dan mendengarkan port tersebut di host Linux Anda secara dinamis.
+> **Note:** With `host` mode, any forward rule added via the Web UI (`http://<server-ip>:8787`) will dynamically bind and listen directly on your host machine.
 
 ---
 
 ### Option 2: Bridge Networking (Port Mapping)
-Jika tidak ingin menggunakan host network, gunakan port mapping standar:
+If you prefer standard Docker bridge networking without host network mode:
 
 ```yaml
 services:
@@ -90,7 +90,7 @@ services:
     restart: unless-stopped
     ports:
       - "8787:8787" # Admin Dashboard
-      # Daftarkan port forwarding yang ingin dibuka ke host:
+      # Expose desired forwarded ports to host:
       - "8080:8080"
       - "5433:5433"
     volumes:
@@ -102,11 +102,10 @@ services:
 ---
 
 ### Target Host / Container Routing
-- Untuk forward ke service di host machine dari dalam container bridge: gunakan target `host.docker.internal` (dengan `extra_hosts: ["host.docker.internal:host-gateway"]`).
-- Jika menggunakan `network_mode: host`, target ke service lokal di mesin host cukup menggunakan `127.0.0.1`.
+- To forward traffic to a service running on the host machine from a bridge container, use target `host.docker.internal` (with `extra_hosts: ["host.docker.internal:host-gateway"]`).
+- When running with `network_mode: host`, targeting local services on the host machine simply uses `127.0.0.1`.
 
 ---
-
 
 ## Windows Service Mode
 
