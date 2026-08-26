@@ -52,11 +52,17 @@
     if (rules.length === 0) {
       rulesListEl.innerHTML = `
         <div class="empty-state">
-          <div class="empty-title">no jacks patched yet</div>
-          <div class="empty-desc">fill in the form below to wire your first forwarding rule</div>
+          <div class="empty-icon">
+            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="12" cy="12" r="2"></circle>
+              <path d="M16.24 7.76a6 6 0 0 1 0 8.49m-8.48-.01a6 6 0 0 1 0-8.49m11.31-2.82a10 10 0 0 1 0 14.14m-14.14 0a10 10 0 0 1 0-14.14"></path>
+            </svg>
+          </div>
+          <div class="empty-title">No jacks patched yet</div>
+          <div class="empty-desc">Fill in the form below to wire your first port forwarding rule.</div>
         </div>
       `;
-      if (summaryTextEl) summaryTextEl.textContent = '0 rules patched &middot; 0 active';
+      if (summaryTextEl) summaryTextEl.innerHTML = '<strong>0</strong> rules &middot; <strong>0</strong> active';
       return;
     }
 
