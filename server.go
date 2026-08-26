@@ -2,6 +2,7 @@ package main
 
 import (
 	"crypto/rand"
+	"crypto/subtle"
 	"embed"
 	"encoding/hex"
 	"encoding/json"
@@ -92,7 +93,26 @@ func (a *App) Routes() http.Handler {
 	mux.HandleFunc("/api/config/logging", a.handleAPIToggleLogging)
 	mux.HandleFunc("/api/update/check", a.handleAPIUpdateCheck)
 	mux.HandleFunc("/api/update/apply", a.handleAPIUpdateApply)
-	return mux
+	return a.wrapAuth(mux)
+}
+
+func (a *App) wrapAuth(next http.Handler) http.Handler {
+	authUser := os.Getenv("PATCHBAY_AUTH_USER")
+	authPass := os.Getenv("PATCHBAY_AUTH_PASS")
+	if authUser == "" && authPass == "" {
+		return next
+	}
+
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		user, pass, ok := r.BasicAuth()
+		if !ok || subtle.ConstantTimeCompare([]byte(user), []byte(authUser)) != 1 ||
+			subtle.ConstantTimeCompare([]byte(pass), []byte(authPass)) != 1 {
+			w.Header().Set("WWW-Authenticate", `Basic realm="Patchbay Dashboard"`)
+			http.Error(w, "Unauthorized", http.StatusUnauthorized)
+			return
+		}
+		next.ServeHTTP(w, r)
+	})
 }
 
 func (a *App) handleIndex(w http.ResponseWriter, r *http.Request) {

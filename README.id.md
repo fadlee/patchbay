@@ -16,6 +16,7 @@ Dibuat menggunakan Go murni dengan web dashboard Vanilla JS tersemat (*embedded*
 - **Mode Windows Service (Opsional)**: Forwarding dan dashboard tetap berjalan saat komputer *reboot* tanpa perlu login pengguna
 - **Pembaruan Otomatis (Auto-Update)**: Mendeteksi rilis baru di GitHub dengan tombol instalasi dan restart otomatis
 - **Konfigurasi Tersimpan Permanen**: Lokasi konfigurasi bersama di `%ProgramData%\patchbay` pada Windows atau volume mount pada Docker
+- **Autentikasi HTTP Basic Auth (Opsional)**: amankan akses dashboard dan API dengan environment variable (`PATCHBAY_AUTH_USER` & `PATCHBAY_AUTH_PASS`)
 - **Nol Dependensi Eksternal**: Seluruh fungsi dibangun dengan Go stdlib dan Win32 API native
 
 ---
@@ -39,6 +40,9 @@ services:
       - ./data:/app
     environment:
       - PATCHBAY_HOST=0.0.0.0 # Bind dashboard ke semua antarmuka jaringan
+      # Autentikasi Opsional:
+      # - PATCHBAY_AUTH_USER=admin
+      # - PATCHBAY_AUTH_PASS=passwordanda
 ```
 
 Atau menggunakan perintah `docker run`:
@@ -74,6 +78,9 @@ services:
       - ./data:/app
     environment:
       - PATCHBAY_HOST=0.0.0.0
+      # Autentikasi Opsional:
+      # - PATCHBAY_AUTH_USER=admin
+      # - PATCHBAY_AUTH_PASS=passwordanda
 ```
 
 ---
@@ -81,6 +88,14 @@ services:
 ### Routing ke Target Host / Kontainer Lain
 - Untuk mem-forward trafik ke service yang berjalan langsung di host Linux dari kontainer bridge: gunakan target `host.docker.internal` (dengan menambahkan `extra_hosts: ["host.docker.internal:host-gateway"]`).
 - Jika menggunakan `network_mode: host`, target ke service lokal di mesin host cukup menggunakan `127.0.0.1`.
+
+
+### Autentikasi Dashboard (Basic Auth)
+Lindungi dashboard dan REST API dengan menyetel environment variable:
+```bash
+-e PATCHBAY_AUTH_USER=admin -e PATCHBAY_AUTH_PASS=passwordanda
+```
+Jika variabel tersebut dikosongkan atau tidak disetel, autentikasi otomatis nonaktif (perilaku bawaan desktop).
 
 ---
 

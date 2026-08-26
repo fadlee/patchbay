@@ -10,7 +10,9 @@ services:
       - ./data:/app
     environment:
       - PATCHBAY_HOST=0.0.0.0 # Binds admin dashboard to all interfaces
-
+      # Optional HTTP Basic Auth for Dashboard & API:
+      # - PATCHBAY_AUTH_USER=admin
+      # - PATCHBAY_AUTH_PASS=yourpassword
     # Alternative if NOT using network_mode: host (Bridge mode):
     # ports:
     #   - "8787:8787" # Admin Dashboard

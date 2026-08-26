@@ -14,7 +14,7 @@ streaming, live traffic logging, and automatic update capabilities via GitHub Re
 - **Native system tray icon**: **Open Dashboard**, **Check for Updates...**, **Service controls**, **Quit**
 - **Optional Windows Service mode**: forwarding and dashboard survive reboots without requiring an active user session
 - **Built-in Auto-Update**: automatically checks latest GitHub releases with one-click update & restart in dashboard and tray
-- **Configuration persistence**: shared config in `%ProgramData%\patchbay` on Windows
+- **Optional HTTP Basic Auth**: secure dashboard and API access via simple environment variables (`PATCHBAY_AUTH_USER` & `PATCHBAY_AUTH_PASS`)
 - **Zero runtime external dependencies**: everything (including tray icon & Win32 service handling) is built using Go stdlib & native Win32 APIs
 ## Build
 
@@ -64,6 +64,9 @@ services:
       - ./data:/app
     environment:
       - PATCHBAY_HOST=0.0.0.0 # Binds dashboard to all network interfaces
+      # Optional Basic Auth:
+      # - PATCHBAY_AUTH_USER=admin
+      # - PATCHBAY_AUTH_PASS=yourpassword
 ```
 
 Or via `docker run`:
@@ -98,6 +101,9 @@ services:
       - ./data:/app
     environment:
       - PATCHBAY_HOST=0.0.0.0
+      # Optional Basic Auth:
+      # - PATCHBAY_AUTH_USER=admin
+      # - PATCHBAY_AUTH_PASS=yourpassword
 ```
 
 ---
@@ -105,6 +111,14 @@ services:
 ### Target Host / Container Routing
 - To forward traffic to a service running on the host machine from a bridge container, use target `host.docker.internal` (with `extra_hosts: ["host.docker.internal:host-gateway"]`).
 - When running with `network_mode: host`, targeting local services on the host machine simply uses `127.0.0.1`.
+---
+
+### Dashboard Authentication (Basic Auth)
+Protect the dashboard and REST APIs by setting environment variables:
+```bash
+-e PATCHBAY_AUTH_USER=admin -e PATCHBAY_AUTH_PASS=yourpassword
+```
+If either variable is unset or empty, authentication is disabled (default for desktop use).
 
 ---
 

@@ -227,3 +227,54 @@ func TestAPIUpdateCheck(t *testing.T) {
 		t.Errorf("expected asset name patchbay-setup-amd64.exe, got %s", info.AssetName)
 	}
 }
+
+func TestBasicAuth(t *testing.T) {
+	store, err := NewConfigStore(t.TempDir() + "/config.json")
+	if err != nil {
+		t.Fatalf("failed to create config store: %v", err)
+	}
+
+	t.Setenv("PATCHBAY_AUTH_USER", "admin")
+	t.Setenv("PATCHBAY_AUTH_PASS", "secret123")
+
+	app := NewApp(store, NewManager(), nil, nil)
+	srv := httptest.NewServer(app.Routes())
+	defer srv.Close()
+
+	// 1. Request without auth header should return 401 Unauthorized
+	resp, err := http.Get(srv.URL + "/")
+	if err != nil {
+		t.Fatalf("GET / failed: %v", err)
+	}
+	if resp.StatusCode != http.StatusUnauthorized {
+		t.Errorf("expected status 401 without auth, got %d", resp.StatusCode)
+	}
+	if authHeader := resp.Header.Get("WWW-Authenticate"); !strings.Contains(authHeader, "Basic") {
+		t.Errorf("expected WWW-Authenticate header, got %q", authHeader)
+	}
+	resp.Body.Close()
+
+	// 2. Request with invalid credentials should return 401
+	reqBad, _ := http.NewRequest(http.MethodGet, srv.URL+"/", nil)
+	reqBad.SetBasicAuth("admin", "wrongpassword")
+	respBad, err := http.DefaultClient.Do(reqBad)
+	if err != nil {
+		t.Fatalf("GET / with bad auth failed: %v", err)
+	}
+	if respBad.StatusCode != http.StatusUnauthorized {
+		t.Errorf("expected status 401 with bad auth, got %d", respBad.StatusCode)
+	}
+	respBad.Body.Close()
+
+	// 3. Request with valid credentials should return 200 OK
+	reqGood, _ := http.NewRequest(http.MethodGet, srv.URL+"/", nil)
+	reqGood.SetBasicAuth("admin", "secret123")
+	respGood, err := http.DefaultClient.Do(reqGood)
+	if err != nil {
+		t.Fatalf("GET / with valid auth failed: %v", err)
+	}
+	if respGood.StatusCode != http.StatusOK {
+		t.Errorf("expected status 200 with valid auth, got %d", respGood.StatusCode)
+	}
+	respGood.Body.Close()
+}
