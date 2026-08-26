@@ -10,9 +10,10 @@ RUN if [ -f go.sum ]; then go mod download; fi
 
 # Copy source code
 COPY . .
+ARG VERSION=1.1.1
 
-# Build static binary for Linux
-RUN CGO_ENABLED=0 GOOS=linux go build -ldflags="-s -w" -o patchbay .
+# Build static binary for Linux with injected version
+RUN CGO_ENABLED=0 GOOS=linux go build -ldflags="-s -w -X main.Version=${VERSION}" -o patchbay .
 
 # Final Stage
 FROM alpine:3.21

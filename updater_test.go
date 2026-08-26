@@ -32,19 +32,18 @@ func TestCompareVersions(t *testing.T) {
 
 func TestMatchAsset(t *testing.T) {
 	assets := []ghAsset{
-		{Name: "patchbay-windows-amd64.exe", BrowserDownloadURL: "http://example.com/win"},
-		{Name: "patchbay-setup-amd64.exe", BrowserDownloadURL: "http://example.com/setup"},
-		{Name: "patchbay-linux-amd64", BrowserDownloadURL: "http://example.com/linux"},
+		{Name: "patchbay-setup-amd64.exe", BrowserDownloadURL: "https://example.com/setup.exe"},
+		{Name: "patchbay-windows-amd64.exe", BrowserDownloadURL: "https://example.com/win.exe"},
 	}
 
-	matchedWin := matchAsset(assets, "windows", "amd64")
-	if matchedWin == nil || matchedWin.Name != "patchbay-setup-amd64.exe" {
-		t.Fatalf("expected setup asset for windows, got %v", matchedWin)
+	winMatch := matchAsset(assets, "windows", "amd64")
+	if winMatch == nil || winMatch.Name != "patchbay-setup-amd64.exe" {
+		t.Errorf("expected setup.exe match for windows, got %v", winMatch)
 	}
 
-	matchedLinux := matchAsset(assets, "linux", "amd64")
-	if matchedLinux == nil || matchedLinux.Name != "patchbay-linux-amd64" {
-		t.Fatalf("expected linux asset, got %v", matchedLinux)
+	linuxMatch := matchAsset(assets, "linux", "amd64")
+	if linuxMatch != nil {
+		t.Errorf("expected nil asset match for linux, got %v", linuxMatch)
 	}
 }
 func TestUpdaterCheckAndDownload(t *testing.T) {

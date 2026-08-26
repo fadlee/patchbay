@@ -5,6 +5,7 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"runtime"
 	"strings"
 	"testing"
 	"time"
@@ -222,7 +223,7 @@ func TestAPIUpdateCheck(t *testing.T) {
 	if info.LatestVersion != "2.0.0" {
 		t.Errorf("expected latest version 2.0.0, got %s", info.LatestVersion)
 	}
-	if info.AssetName != "patchbay-setup-amd64.exe" {
+	if runtime.GOOS == "windows" && info.AssetName != "patchbay-setup-amd64.exe" {
 		t.Errorf("expected asset name patchbay-setup-amd64.exe, got %s", info.AssetName)
 	}
 }

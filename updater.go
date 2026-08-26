@@ -207,36 +207,32 @@ func matchAsset(assets []ghAsset, targetOS, targetArch string) *ghAsset {
 		return nil
 	}
 
-	// For Windows, prefer installer setup .exe, then windows-amd64 .exe
-	if targetOS == "windows" {
-		for i := range assets {
-			name := strings.ToLower(assets[i].Name)
-			if strings.Contains(name, "setup") && strings.HasSuffix(name, ".exe") {
-				return &assets[i]
-			}
-		}
-		for i := range assets {
-			name := strings.ToLower(assets[i].Name)
-			if strings.Contains(name, "windows") && strings.HasSuffix(name, ".exe") {
-				return &assets[i]
-			}
-		}
-		for i := range assets {
-			if strings.HasSuffix(strings.ToLower(assets[i].Name), ".exe") {
-				return &assets[i]
-			}
-		}
+	// Auto-installer download & execution is only supported for Windows.
+	// Non-Windows (Linux/Docker) updates are managed via container pull or package manager.
+	if targetOS != "windows" {
+		return nil
 	}
 
-	// Generic match
+	// For Windows, prefer installer setup .exe, then windows-amd64 .exe
 	for i := range assets {
 		name := strings.ToLower(assets[i].Name)
-		if strings.Contains(name, targetOS) && (targetArch == "" || strings.Contains(name, targetArch)) {
+		if strings.Contains(name, "setup") && strings.HasSuffix(name, ".exe") {
+			return &assets[i]
+		}
+	}
+	for i := range assets {
+		name := strings.ToLower(assets[i].Name)
+		if strings.Contains(name, "windows") && strings.HasSuffix(name, ".exe") {
+			return &assets[i]
+		}
+	}
+	for i := range assets {
+		if strings.HasSuffix(strings.ToLower(assets[i].Name), ".exe") {
 			return &assets[i]
 		}
 	}
 
-	return &assets[0]
+	return nil
 }
 
 // compareVersions returns 1 if v1 > v2, -1 if v1 < v2, 0 if v1 == v2.
