@@ -3,7 +3,7 @@
 [English Version](README.md)
 
 Port forwarder TCP/UDP modern dan alternatif HAProxy yang simpel dengan Web UI.
-Tersedia sebagai aplikasi/service Windows mandiri atau sebagai **kontainer Docker** untuk server Linux.
+Tersedia sebagai aplikasi/service Windows mandiri, **Aplikasi Android (.apk)**, atau sebagai **kontainer Docker** untuk server Linux.
 Dibuat menggunakan Go murni dengan web dashboard Vanilla JS tersemat (*embedded*), *realtime streaming* Server-Sent Events (SSE), pencatatan trafik langsung (*live traffic logging*), dan kemampuan pembaruan otomatis melalui GitHub Releases.
 
 ## Fitur Utama
@@ -17,8 +17,21 @@ Dibuat menggunakan Go murni dengan web dashboard Vanilla JS tersemat (*embedded*
 - **Pembaruan Otomatis (Auto-Update)**: Mendeteksi rilis baru di GitHub dengan tombol instalasi dan restart otomatis
 - **Konfigurasi Tersimpan Permanen**: Lokasi konfigurasi bersama di `%ProgramData%\patchbay` pada Windows atau volume mount pada Docker
 - **Autentikasi HTTP Basic Auth (Opsional)**: amankan akses dashboard dan API dengan environment variable (`PATCHBAY_AUTH_USER` & `PATCHBAY_AUTH_PASS`)
+- **Aplikasi Android (APK)**: Dibangun dengan Gomobile, *Foreground Service*, notifikasi persisten status bar, dan WebView UI
 - **Nol Dependensi Eksternal**: Seluruh fungsi dibangun dengan Go stdlib dan Win32 API native
 
+
+---
+
+## Menjalankan di Android
+
+Unduh `patchbay-android-*.apk` dari [GitHub Releases](https://github.com/fadlee/patchbay/releases) terbaru.
+
+Saat aplikasi dibuka:
+- Menjalankan **Foreground Service** native dengan notifikasi persisten di status bar (`Patchbay is Active`) dan tombol aksi cepat **Stop**.
+- Menggunakan `PARTIAL_WAKE_LOCK` sehingga forwarding TCP/UDP tetap hidup meski layar HP mati atau aplikasi di background.
+- Mendukung pemulihan aturan aktif otomatis saat HP dinyalakan ulang (`BOOT_COMPLETED`).
+- WebView Material 3 bawaan yang terhubung langsung ke dashboard lokal Go (`http://127.0.0.1:8787`).
 ---
 
 ## Menjalankan dengan Docker (Linux / Server)

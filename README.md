@@ -3,7 +3,7 @@
 English | [Bahasa Indonesia](README.id.md)
 
 Modern TCP/UDP port forwarder and lightweight HAProxy alternative with Web UI.
-Available as a standalone Windows app/service or as a **Docker container** for Linux servers.
+Available as a standalone Windows app/service, **Android App (.apk)**, or as a **Docker container** for Linux servers.
 Built in Go with an embedded Vanilla JS web dashboard, Server-Sent Events (SSE) realtime
 streaming, live traffic logging, and automatic update capabilities via GitHub Releases.
 ## Features
@@ -15,6 +15,7 @@ streaming, live traffic logging, and automatic update capabilities via GitHub Re
 - **Optional Windows Service mode**: forwarding and dashboard survive reboots without requiring an active user session
 - **Built-in Auto-Update**: automatically checks latest GitHub releases with one-click update & restart in dashboard and tray
 - **Optional HTTP Basic Auth**: secure dashboard and API access via simple environment variables (`PATCHBAY_AUTH_USER` & `PATCHBAY_AUTH_PASS`)
+- **Android App (APK)**: native Android wrapper with Gomobile, Foreground Service, persistent notification, and WebView UI
 - **Zero runtime external dependencies**: everything (including tray icon & Win32 service handling) is built using Go stdlib & native Win32 APIs
 ## Build
 
@@ -30,6 +31,10 @@ task build-installer
 
 # Build local dev binary on Linux / macOS:
 task build
+
+# Build Android AAR & APK (requires gomobile, Android SDK/NDK, Gradle):
+task build-android-aar
+task build-android-apk
 ```
 ## Run
 
@@ -44,6 +49,16 @@ On Windows, config/rules and traffic logs are stored in:
 On first run, an existing `portforward-config.json` next to the executable
 is migrated there. On non-Windows, the config and logs stay adjacent to the
 executable for development.
+
+## Run on Android
+
+Download `patchbay-android-*.apk` from the latest [GitHub Releases](https://github.com/fadlee/patchbay/releases).
+
+When opened:
+- Starts a native **Foreground Service** with a persistent status bar notification (`Patchbay is Active`) and a quick **Stop** action.
+- Utilizes `PARTIAL_WAKE_LOCK` so forwarding stays active even when the screen is off or in background.
+- Automatically restores active rules on device boot (`RECEIVE_BOOT_COMPLETED`).
+- Built-in Material 3 WebView connects directly to local Go engine dashboard (`http://127.0.0.1:8787`).
 
 ## Run with Docker (Linux / Server)
 
