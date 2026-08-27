@@ -70,6 +70,10 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun setupWebView() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.KITKAT) {
+            WebView.setWebContentsDebuggingEnabled(true)
+        }
+
         with(binding.webView.settings) {
             javaScriptEnabled = true
             domStorageEnabled = true
@@ -82,7 +86,12 @@ class MainActivity : AppCompatActivity() {
             displayZoomControls = false
         }
 
-        binding.webView.webChromeClient = WebChromeClient()
+        binding.webView.webChromeClient = object : WebChromeClient() {
+            override fun onConsoleMessage(message: android.webkit.ConsoleMessage?): Boolean {
+                android.util.Log.d("PatchbayWebView", "${message?.message()} -- From line ${message?.lineNumber()} of ${message?.sourceId()}")
+                return true
+            }
+        }
         binding.webView.webViewClient = object : WebViewClient() {
             override fun onPageStarted(view: WebView?, url: String?, favicon: Bitmap?) {
                 super.onPageStarted(view, url, favicon)

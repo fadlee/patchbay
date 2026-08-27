@@ -656,23 +656,45 @@ func (a *App) Routes() http.Handler {
 		w.Header().Set("Content-Type", "application/json")
 		switch r.Method {
 		case http.MethodGet:
-			_ = json.NewEncoder(w).Encode(a.ruleViews())
+			_ = json.NewEncoder(w).Encode(map[string]any{
+				"rules": a.ruleViews(),
+			})
 		case http.MethodPost:
 			var req Rule
 			if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-				http.Error(w, err.Error(), http.StatusBadRequest)
+				_ = r.ParseForm()
+				req.Name = r.FormValue("name")
+				req.Protocol = r.FormValue("protocol")
+				req.ListenAddr = r.FormValue("listen_addr")
+				req.ListenPort, _ = strconv.Atoi(r.FormValue("listen_port"))
+				req.TargetAddr = r.FormValue("target_addr")
+				req.TargetPort, _ = strconv.Atoi(r.FormValue("target_port"))
+			}
+			if req.ListenPort <= 0 || req.ListenPort > 65535 || req.TargetPort <= 0 || req.TargetPort > 65535 {
+				http.Error(w, `{"error":"invalid ports"}`, http.StatusBadRequest)
 				return
 			}
+			if req.ListenAddr == "" {
+				req.ListenAddr = "0.0.0.0"
+			}
+			if req.Protocol == "" {
+				req.Protocol = "tcp"
+			}
+			if req.Name == "" {
+				req.Name = fmt.Sprintf("%s:%d -> %s:%d", req.ListenAddr, req.ListenPort, req.TargetAddr, req.TargetPort)
+			}
+			req.Enabled = true
 			if req.ID == "" {
 				b := make([]byte, 8)
 				_, _ = rand.Read(b)
 				req.ID = hex.EncodeToString(b)
 			}
 			_ = a.store.AddRule(req)
-			if req.Enabled {
-				_ = a.manager.Start(req)
-			}
-			_ = json.NewEncoder(w).Encode(req)
+			_ = a.manager.Start(req)
+			_ = json.NewEncoder(w).Encode(map[string]any{
+				"success": true,
+				"rule":    req,
+			})
 		}
 	})
 
@@ -709,10 +731,10 @@ func (a *App) Routes() http.Handler {
 	mux.HandleFunc("/api/logs", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		if a.logger == nil {
-			_ = json.NewEncoder(w).Encode([]LogEntry{})
+			_ = json.NewEncoder(w).Encode(map[string]any{"logs": []LogEntry{}})
 			return
 		}
-		_ = json.NewEncoder(w).Encode(a.logger.RecentEntries(100))
+		_ = json.NewEncoder(w).Encode(map[string]any{"logs": a.logger.RecentEntries(100)})
 	})
 
 	mux.HandleFunc("/api/events", func(w http.ResponseWriter, r *http.Request) {
