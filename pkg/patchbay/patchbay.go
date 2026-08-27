@@ -451,23 +451,54 @@ func (m *Manager) serveTCP(ctx context.Context, ln net.Listener, target string, 
 			continue
 		}
 
-		tracker.add(conn)
-		atomic.AddInt64(&stats.ActiveConns, 1)
-		atomic.AddInt64(&stats.TotalConns, 1)
+		if tc, ok := conn.(*net.TCPConn); ok {
+			_ = tc.SetNoDelay(true)
+			_ = tc.SetKeepAlive(true)
+			_ = tc.SetKeepAlivePeriod(30 * time.Second)
+		}
 
+		tracker.add(conn)
 		go func(c net.Conn) {
+			start := time.Now()
+			clientAddr := c.RemoteAddr().String()
 			defer func() {
 				tracker.remove(c)
 				_ = c.Close()
-				atomic.AddInt64(&stats.ActiveConns, -1)
 			}()
 
-			start := time.Now()
-			remote, err := net.DialTimeout("tcp", target, 5*time.Second)
+			dialer := net.Dialer{
+				Timeout:   3 * time.Second,
+				KeepAlive: 30 * time.Second,
+			}
+			remote, err := dialer.DialContext(ctx, "tcp", target)
 			if err != nil {
+				if m.logger != nil {
+					m.logger.Record(LogEntry{
+						ID:         strconv.FormatInt(time.Now().UnixNano(), 36),
+						Time:       start,
+						RuleID:     rule.ID,
+						RuleName:   rule.Name,
+						Protocol:   "tcp",
+						ClientAddr: clientAddr,
+						TargetAddr: target,
+						DurationMS: time.Since(start).Milliseconds(),
+						Status:     "error",
+					})
+				}
 				return
 			}
-			defer remote.Close()
+			if rc, ok := remote.(*net.TCPConn); ok {
+				_ = rc.SetNoDelay(true)
+			}
+			tracker.add(remote)
+			defer func() {
+				tracker.remove(remote)
+				_ = remote.Close()
+			}()
+
+			atomic.AddInt64(&stats.ActiveConns, 1)
+			atomic.AddInt64(&stats.TotalConns, 1)
+			defer atomic.AddInt64(&stats.ActiveConns, -1)
 
 			var bytesIn, bytesOut int64
 			var wg sync.WaitGroup
@@ -478,6 +509,9 @@ func (m *Manager) serveTCP(ctx context.Context, ln net.Listener, target string, 
 				n, _ := io.Copy(remote, c)
 				atomic.AddInt64(&stats.BytesIn, n)
 				atomic.AddInt64(&bytesIn, n)
+				if tc, ok := remote.(*net.TCPConn); ok {
+					_ = tc.CloseWrite()
+				}
 			}()
 
 			go func() {
@@ -485,6 +519,9 @@ func (m *Manager) serveTCP(ctx context.Context, ln net.Listener, target string, 
 				n, _ := io.Copy(c, remote)
 				atomic.AddInt64(&stats.BytesOut, n)
 				atomic.AddInt64(&bytesOut, n)
+				if tc, ok := c.(*net.TCPConn); ok {
+					_ = tc.CloseWrite()
+				}
 			}()
 
 			wg.Wait()
@@ -496,7 +533,7 @@ func (m *Manager) serveTCP(ctx context.Context, ln net.Listener, target string, 
 					RuleID:     rule.ID,
 					RuleName:   rule.Name,
 					Protocol:   "tcp",
-					ClientAddr: c.RemoteAddr().String(),
+					ClientAddr: clientAddr,
 					TargetAddr: target,
 					BytesIn:    bytesIn,
 					BytesOut:   bytesOut,
