@@ -2,3 +2,13 @@
 *.exe
 portforward-config.json
 /dist/
+
+# Android build artifacts
+.gradle/
+build/
+android/.gradle/
+android/app/build/
+android/app/libs/*.aar
+android/app/libs/*.jar
+*.apk
+*.aab

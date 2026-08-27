@@ -1,0 +1,9 @@
+<resources>
+    <string name="app_name">Patchbay</string>
+    <string name="service_running_title">Patchbay is Active</string>
+    <string name="service_running_desc">Port forwarder running on %1$s</string>
+    <string name="action_stop">Stop</string>
+    <string name="action_open">Open Dashboard</string>
+    <string name="notification_channel_name">Patchbay Service</string>
+    <string name="notification_channel_desc">Shows status when port forwarder is running</string>
+</resources>

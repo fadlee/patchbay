@@ -26,6 +26,18 @@ tasks:
     deps: [build-windows]
     cmds:
       - makensis {{if .VERSION}}-DPRODUCT_VERSION="{{.VERSION}}"{{end}} installer.nsi
+  build-android-aar:
+    desc: Build Android AAR library using gomobile
+    deps: [ensure-dist]
+    cmds:
+      - gomobile bind -target=android -androidapi 21 -o android/app/libs/patchbay.aar ./pkg/patchbay
+
+  build-android-apk:
+    desc: Build debug Android APK
+    deps: [build-android-aar]
+    cmds:
+      - cd android && ./gradlew assembleDebug || gradle assembleDebug
+
   windows-resource:
     internal: true
     cmds:
