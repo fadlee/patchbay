@@ -26,6 +26,8 @@ android {
     buildTypes {
         release {
             isMinifyEnabled = false
+            // Sign with default debug keystore so release APKs can be directly installed on Android devices
+            signingConfig = signingConfigs.getByName("debug")
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
