@@ -17,6 +17,18 @@ streaming, live traffic logging, and automatic update capabilities via GitHub Re
 - **Optional HTTP Basic Auth**: secure dashboard and API access via simple environment variables (`PATCHBAY_AUTH_USER` & `PATCHBAY_AUTH_PASS`)
 - **Android App (APK)**: native Android wrapper with Gomobile, Foreground Service, persistent notification, and WebView UI
 - **Zero runtime external dependencies**: everything (including tray icon & Win32 service handling) is built using Go stdlib & native Win32 APIs
+
+---
+
+## Patchbay vs SSH Tunnel
+
+| Feature | **Patchbay** | **SSH Tunnel** (`ssh -L / -R`) |
+|---|---|---|
+| **Architecture** | **Standalone / Zero Server** (runs directly on device) | **Client-Server** (requires remote SSH server/daemon) |
+| **Protocols** | **TCP & UDP** out-of-the-box (DNS, WireGuard, VoIP, Game, HTTP) | **TCP only** natively (UDP requires complex TUN/TAP setup) |
+| **UI & Observability** | **Visual Web Dashboard** with realtime Canvas charts & session logs | **CLI / Terminal only** |
+| **Performance Overhead** | **Near-zero latency** direct layer-4 streaming (`io.Copy`) | Encryption/decryption CPU overhead per packet |
+| **Use Case** | Local port mapping, microservice routing, visual traffic monitoring | Encrypted perimeter traversal, remote jump-hosts / bastions |
 ## Build
 
 Requires Go 1.22+ and [Task](https://taskfile.dev).

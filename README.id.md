@@ -20,6 +20,18 @@ Dibuat menggunakan Go murni dengan web dashboard Vanilla JS tersemat (*embedded*
 - **Aplikasi Android (APK)**: Dibangun dengan Gomobile, *Foreground Service*, notifikasi persisten status bar, dan WebView UI
 - **Nol Dependensi Eksternal**: Seluruh fungsi dibangun dengan Go stdlib dan Win32 API native
 
+---
+
+## Perbedaan Patchbay vs SSH Tunnel
+
+| Fitur / Karakteristik | **Patchbay** | **SSH Tunnel** (`ssh -L / -R`) |
+|---|---|---|
+| **Kebutuhan Server** | **Standalone / Zero Server** (berjalan langsung di perangkat) | **Wajib Server SSH** (butuh remote host & daemon SSH aktif) |
+| **Dukungan Protokol** | **TCP & UDP** bawaan (DNS, WireGuard, Game, VoIP, HTTP, DB) | **Hanya TCP** secara native (UDP butuh konfigurasi TUN/TAP rumit) |
+| **Antarmuka & Monitoring** | **Web Dashboard Visual** dengan grafik realtime & log koneksi harian | **CLI / Terminal saja** |
+| **Overhead & Performa** | **Sangat ringan** streaming langsung layer-4 (`io.Copy`), hemat baterai/CPU | Ada beban CPU untuk enkripsi/dekripsi tiap paket data |
+| **Tujuan Utama** | Pemetaan port lokal/LAN, perutean microservice, observabilitas trafik | Melintasi perimeter jaringan publik dengan enkripsi aman (bastion) |
+
 
 ---
 
