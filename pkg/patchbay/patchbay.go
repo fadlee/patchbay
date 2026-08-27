@@ -467,7 +467,7 @@ func (m *Manager) serveTCP(ctx context.Context, ln net.Listener, target string, 
 			}()
 
 			dialer := net.Dialer{
-				Timeout:   3 * time.Second,
+				Timeout:   10 * time.Second,
 				KeepAlive: 30 * time.Second,
 			}
 			remote, err := dialer.DialContext(ctx, "tcp", target)
@@ -482,7 +482,7 @@ func (m *Manager) serveTCP(ctx context.Context, ln net.Listener, target string, 
 						ClientAddr: clientAddr,
 						TargetAddr: target,
 						DurationMS: time.Since(start).Milliseconds(),
-						Status:     "error",
+						Status:     "error: " + err.Error(),
 					})
 				}
 				return
