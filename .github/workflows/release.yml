@@ -114,14 +114,17 @@ jobs:
         run: |
           cd android
           gradle assembleRelease || gradle assembleDebug
-          cp app/build/outputs/apk/*/*.apk ../patchbay-android-${{ steps.get_version.outputs.version }}.apk
+          mkdir -p ../dist-apk
+          for apk in app/build/outputs/apk/*/*.apk; do
+            name=$(basename "$apk" .apk)
+            cp "$apk" "../dist-apk/patchbay-android-${{ steps.get_version.outputs.version }}-${name}.apk"
+          done
 
-      - name: Upload APK to GitHub Release
+      - name: Upload APKs to GitHub Release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ steps.get_version.outputs.tag }}
-          files: patchbay-android-${{ steps.get_version.outputs.version }}.apk
-
+          files: dist-apk/*.apk
   docker-release:
     runs-on: ubuntu-latest
     steps:

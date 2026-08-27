@@ -43,18 +43,15 @@ jobs:
           mkdir -p android/app/libs
           gomobile bind -target=android -androidapi 21 -o android/app/libs/patchbay.aar ./pkg/patchbay
 
-      - name: Setup Gradle
-        uses: gradle/actions/setup-gradle@v3
-
       - name: Build APK with Gradle
         run: |
           cd android
           chmod +x ./gradlew 2>/dev/null || true
           gradle assembleDebug
 
-      - name: Upload APK Artifact
+      - name: Upload APK Artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: patchbay-android-debug-apk
-          path: android/app/build/outputs/apk/debug/app-debug.apk
+          name: patchbay-android-apks
+          path: android/app/build/outputs/apk/debug/*.apk
           if-no-files-found: error
